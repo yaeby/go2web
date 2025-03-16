@@ -137,10 +137,6 @@ public class Go2Web {
         return connection;
     }
 
-    private static String repeatChar(char ch, int count) {
-        return String.valueOf(ch).repeat(Math.max(0, count));
-    }
-
     private static String extractReadableContent(String html) {
         StringBuilder result = new StringBuilder();
 
@@ -157,7 +153,6 @@ public class Go2Web {
             String title = cleanText(titleMatcher.group(1));
             if (!title.isBlank()) {
                 result.append(title).append("\n");
-//                result.append(repeatChar('=', Math.min(title.length(), 40))).append("\n\n");
                 result.append(String.valueOf('=').repeat(Math.min(title.length(), 40))).append("\n\n");
             }
         }
@@ -182,7 +177,7 @@ public class Go2Web {
                 if (!heading.isEmpty() && !heading.trim().isEmpty()) {
                     result.append(heading).append("\n");
                     if (i <= 2) {
-                        result.append(repeatChar(i == 1 ? '=' : '-', Math.min(heading.length(), 40))).append("\n");
+                        result.append(String.valueOf(i == 1 ? '=' : '-').repeat(Math.min(heading.length(), 40))).append("\n");
                     }
                     result.append("\n");
                 }
@@ -320,7 +315,7 @@ public class Go2Web {
                     } while (thMatcher.find());
 
                     result.append(rowText.toString().trim()).append("\n");
-                    result.append(repeatChar('-', Math.min(rowText.length(), 40))).append("\n");
+                    result.append(String.valueOf('-').repeat(Math.min(rowText.length(), 40))).append("\n");
                 } else {
                     Pattern tdPattern = Pattern.compile("<td[^>]*>(.*?)</td>", Pattern.DOTALL);
                     Matcher tdMatcher = tdPattern.matcher(rowContent);
