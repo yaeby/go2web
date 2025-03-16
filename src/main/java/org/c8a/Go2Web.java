@@ -138,9 +138,7 @@ public class Go2Web {
     }
 
     private static String repeatChar(char ch, int count) {
-        StringBuilder sb = new StringBuilder(count);
-        sb.append(String.valueOf(ch).repeat(Math.max(0, count)));
-        return sb.toString();
+        return String.valueOf(ch).repeat(Math.max(0, count));
     }
 
     private static String extractReadableContent(String html) {
@@ -159,7 +157,8 @@ public class Go2Web {
             String title = cleanText(titleMatcher.group(1));
             if (!title.isBlank()) {
                 result.append(title).append("\n");
-                result.append(repeatChar('=', Math.min(title.length(), 40))).append("\n\n");
+//                result.append(repeatChar('=', Math.min(title.length(), 40))).append("\n\n");
+                result.append(String.valueOf('=').repeat(Math.min(title.length(), 40))).append("\n\n");
             }
         }
 
@@ -180,7 +179,7 @@ public class Go2Web {
             Matcher hMatcher = hPattern.matcher(cleanHtml);
             while (hMatcher.find()) {
                 String heading = cleanText(hMatcher.group(1));
-                if (!heading.isEmpty() && heading.trim().length() > 0) {
+                if (!heading.isEmpty() && !heading.trim().isEmpty()) {
                     result.append(heading).append("\n");
                     if (i <= 2) {
                         result.append(repeatChar(i == 1 ? '=' : '-', Math.min(heading.length(), 40))).append("\n");
@@ -194,7 +193,7 @@ public class Go2Web {
         Matcher pMatcher = pPattern.matcher(cleanHtml);
         while (pMatcher.find()) {
             String paragraph = cleanText(pMatcher.group(1));
-            if (!paragraph.isEmpty() && paragraph.trim().length() > 0) {
+            if (!paragraph.isEmpty() && !paragraph.trim().isEmpty()) {
                 result.append(paragraph).append("\n\n");
             }
         }
@@ -211,7 +210,7 @@ public class Go2Web {
                 String divContent = contentDivMatcher.group(1);
                 if (!divContent.contains("<div")) {  // Skip nested divs
                     String cleaned = cleanText(divContent);
-                    if (!cleaned.isEmpty() && cleaned.trim().length() > 0 && !processedContents.contains(cleaned)) {
+                    if (!cleaned.isEmpty() && !cleaned.trim().isEmpty() && !processedContents.contains(cleaned)) {
                         processedContents.add(cleaned);
                         result.append(cleaned).append("\n\n");
                     }
@@ -240,7 +239,7 @@ public class Go2Web {
             Matcher bodyMatcher = bodyPattern.matcher(html);
             if (bodyMatcher.find()) {
                 String bodyContent = cleanText(bodyMatcher.group(1));
-                if (!bodyContent.isEmpty() && bodyContent.trim().length() > 0) {
+                if (!bodyContent.isEmpty() && !bodyContent.trim().isEmpty()) {
                     result.append(bodyContent);
                 }
             }
@@ -267,7 +266,7 @@ public class Go2Web {
 
             while (liMatcher.find()) {
                 String item = cleanText(liMatcher.group(1));
-                if (!item.isEmpty() && item.trim().length() > 0) {
+                if (!item.isEmpty() && !item.trim().isEmpty()) {
                     result.append("• ").append(item).append("\n");
                 }
             }
@@ -287,7 +286,7 @@ public class Go2Web {
             int itemNumber = 1;
             while (liMatcher.find()) {
                 String item = cleanText(liMatcher.group(1));
-                if (!item.isEmpty() && item.trim().length() > 0) {
+                if (!item.isEmpty() && !item.trim().isEmpty()) {
                     result.append(itemNumber++).append(". ").append(item).append("\n");
                 }
             }
@@ -359,15 +358,12 @@ public class Go2Web {
                 .replaceAll("&ndash;", "-")
                 .replaceAll("&hellip;", "...");
 
-        // Normalize whitespace
-        String normalized = decoded.replaceAll("\\s+", " ").trim();
-
-        return normalized;
+        return decoded.replaceAll("\\s+", " ").trim();
     }
 
     private static void searchDuckDuckGo(String searchTerm) {
         try {
-            String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8.toString());
+            String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
             String searchUrl = "https://html.duckduckgo.com/html/?q=" + encodedSearchTerm;
 
             URL url = new URL(searchUrl);
