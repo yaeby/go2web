@@ -171,8 +171,6 @@ public class Go2Web {
                         response.append(inputLine).append("\n");
                     }
 
-//                    String htmlContent = response.toString();
-//                    String readableContent = extractReadableContent(htmlContent);
                     String contentType = connection.getContentType().split(";")[0].trim();
                     String readableContent;
 
@@ -246,7 +244,7 @@ public class Go2Web {
             Matcher matcher = maxAgePattern.matcher(cacheControl);
             if (matcher.find()) {
                 try {
-                    String maxAgeStr = matcher.group(1).trim(); // Trim whitespace
+                    String maxAgeStr = matcher.group(1).trim();
                     long maxAge = Long.parseLong(maxAgeStr) * 1000;
                     if (maxAge <= 0) return 0;
                     return System.currentTimeMillis() + maxAge;
@@ -336,7 +334,7 @@ public class Go2Web {
 
             while (contentDivMatcher.find()) {
                 String divContent = contentDivMatcher.group(1);
-                if (!divContent.contains("<div")) {  // Skip nested divs
+                if (!divContent.contains("<div")) {
                     String cleaned = cleanText(divContent);
                     if (!cleaned.isEmpty() && !cleaned.trim().isEmpty() && !processedContents.contains(cleaned)) {
                         processedContents.add(cleaned);
@@ -351,7 +349,7 @@ public class Go2Web {
 
                 while (divMatcher.find() && result.length() < 1000) {
                     String divContent = divMatcher.group(1);
-                    if (!divContent.contains("<div")) {  // Skip nested divs
+                    if (!divContent.contains("<div")) {
                         String cleaned = cleanText(divContent);
                         if (!cleaned.isEmpty() && cleaned.trim().length() > 40 && !processedContents.contains(cleaned)) {
                             processedContents.add(cleaned);
@@ -497,7 +495,6 @@ public class Go2Web {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
-//            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
             connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
             connection.setRequestProperty("Connection", "keep-alive");
@@ -567,4 +564,16 @@ public class Go2Web {
 
         return results;
     }
+
+    //TODO: Implement json formating
+//    private static String formatJson(String json) {
+//        try {
+//            ObjectMapper mapper = new ObjectMapper();
+//            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+//            Object jsonObject = mapper.readValue(json, Object.class);
+//            return mapper.writeValueAsString(jsonObject);
+//        } catch (Exception e) {
+//            return json; // Return raw JSON if parsing fails
+//        }
+//    }
 }
