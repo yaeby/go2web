@@ -73,14 +73,11 @@ public class Go2Web {
                 URL url = new URL(urlString);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
-                // Timeout settings (10 seconds)
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
 
-                // Disable automatic redirect following
                 connection.setInstanceFollowRedirects(false);
 
-                // Set request headers
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
                 connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
@@ -88,7 +85,6 @@ public class Go2Web {
 
                 int responseCode = connection.getResponseCode();
 
-                // Check for redirect (3xx status codes)
                 if (responseCode >= 300 && responseCode < 400) {
                     String location = connection.getHeaderField("Location");
                     if (location == null || location.isEmpty()) {
@@ -96,12 +92,10 @@ public class Go2Web {
                         return;
                     }
 
-                    // Resolve relative URLs
                     URL base = new URL(urlString);
                     URL resolvedUrl = new URL(base, location);
                     urlString = resolvedUrl.toString();
 
-                    // Close current connection before reopening
                     connection.disconnect();
 
                     if (redirectCount++ >= MAX_REDIRECTS) {
@@ -113,11 +107,9 @@ public class Go2Web {
                     continue;
                 }
 
-                // Handle non-redirect response
                 System.out.println("Final URL: " + urlString);
                 System.out.println("Response Code: " + responseCode);
 
-                // Read response content
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                     String inputLine;
                     StringBuilder response = new StringBuilder();
@@ -131,7 +123,7 @@ public class Go2Web {
                     System.out.println(readableContent);
                 }
 
-                break; // Exit loop after successful request
+                break;
             }
         } catch (SocketTimeoutException ste) {
             System.out.println("Error: Connection timed out. The server is too slow to respond.");
