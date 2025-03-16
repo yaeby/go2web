@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Go2Web {
+    private static final Map<String, CacheEntry> cache = new HashMap<>();
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -70,7 +71,14 @@ public class Go2Web {
             }
 
             while (true) {
-                HttpURLConnection connection = getHttpURLConnection(urlString);
+                CacheEntry cached = cache.get(urlString);
+                if (cached != null && !cached.isExpired()) {
+                    System.out.println("Serving from cache:");
+                    System.out.println(cached.getContent());
+                    return;
+                }
+
+                HttpURLConnection connection = getHttpURLConnection(urlString, cached);
 
                 int responseCode = connection.getResponseCode();
 
@@ -96,8 +104,15 @@ public class Go2Web {
                     continue;
                 }
 
-                System.out.println("Final URL: " + urlString);
-                System.out.println("Response Code: " + responseCode);
+                if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
+                    System.out.println("Resource not modified. Serving from cache:");
+                    System.out.println(cached.getContent());
+                    return;
+                }
+                else {
+                    System.out.println("Final URL: " + urlString);
+                    System.out.println("Response Code: " + responseCode);
+                }
 
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                     String inputLine;
@@ -109,6 +124,15 @@ public class Go2Web {
 
                     String htmlContent = response.toString();
                     String readableContent = extractReadableContent(htmlContent);
+
+                    Map<String, String> headers = new HashMap<>();
+                    headers.put("ETag", connection.getHeaderField("ETag"));
+                    headers.put("Last-Modified", connection.getHeaderField("Last-Modified"));
+                    headers.put("Cache-Control", connection.getHeaderField("Cache-Control"));
+
+                    long expirationTime = calculateExpirationTime(headers);
+                    cache.put(urlString, new CacheEntry(readableContent, headers, expirationTime));
+
                     System.out.println(readableContent);
                 }
 
@@ -121,20 +145,61 @@ public class Go2Web {
         }
     }
 
-    private static HttpURLConnection getHttpURLConnection(String urlString) throws IOException {
+    private static HttpURLConnection getHttpURLConnection(String urlString, CacheEntry cached) throws IOException {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(10000);
 
-        connection.setInstanceFollowRedirects(false);
+        if (cached != null) {
+            String etag = cached.getHeaders().get("ETag");
+            String lastModified = cached.getHeaders().get("Last-Modified");
+            if (etag != null) connection.setRequestProperty("If-None-Match", etag);
+            if (lastModified != null) connection.setRequestProperty("If-Modified-Since", lastModified);
+        }
 
+        connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("GET");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
         connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
         connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
         return connection;
+    }
+
+    private static long calculateExpirationTime(Map<String, String> headers) {
+        // Default: 1 hour if no Cache-Control/Expires headers
+        long defaultTTL = 60 * 60 * 1000;
+        String cacheControl = headers.get("Cache-Control");
+        String expires = headers.get("Expires");
+
+        if (cacheControl != null) {
+            // Parse max-age directive (e.g., "max-age=3600")
+            if (cacheControl.contains("max-age=")) {
+                String[] parts = cacheControl.split("max-age=");
+                if (parts.length > 1) {
+                    String maxAgeStr = parts[1].split(",")[0].trim();
+                    try {
+                        long maxAge = Long.parseLong(maxAgeStr) * 1000;
+                        return System.currentTimeMillis() + maxAge;
+                    } catch (NumberFormatException e) {
+                        // Ignore invalid max-age
+                    }
+                }
+            }
+        }
+
+        if (expires != null) {
+            try {
+                // Parse Expires header (e.g., "Wed, 21 Oct 2025 07:28:00 GMT")
+                Date expiresDate = new Date(expires);
+                return expiresDate.getTime();
+            } catch (Exception e) {
+                // Fallback to default
+            }
+        }
+
+        return System.currentTimeMillis() + defaultTTL;
     }
 
     private static String extractReadableContent(String html) {

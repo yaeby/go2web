@@ -1,13 +1,11 @@
 package org.c8a;
 
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 
 public class CacheEntry {
     private final String content;
     private final Map<String, String> headers;
-    private final long expirationTime; // Time when the entry expires (milliseconds)
+    private final long expirationTime;
 
     public CacheEntry(String content, Map<String, String> headers, long expirationTime) {
         this.content = content;
