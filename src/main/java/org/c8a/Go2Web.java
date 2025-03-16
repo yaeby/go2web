@@ -8,6 +8,7 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -168,34 +169,36 @@ public class Go2Web {
     }
 
     private static long calculateExpirationTime(Map<String, String> headers) {
-        // Default: 1 hour if no Cache-Control/Expires headers
         long defaultTTL = 60 * 60 * 1000;
         String cacheControl = headers.get("Cache-Control");
         String expires = headers.get("Expires");
 
         if (cacheControl != null) {
-            // Parse max-age directive (e.g., "max-age=3600")
-            if (cacheControl.contains("max-age=")) {
-                String[] parts = cacheControl.split("max-age=");
-                if (parts.length > 1) {
-                    String maxAgeStr = parts[1].split(",")[0].trim();
-                    try {
-                        long maxAge = Long.parseLong(maxAgeStr) * 1000;
-                        return System.currentTimeMillis() + maxAge;
-                    } catch (NumberFormatException e) {
-                        // Ignore invalid max-age
-                    }
+            if (cacheControl.contains("no-cache") || cacheControl.contains("no-store")) {
+                System.out.println("Cache-Control: no-cache, no-store");
+                return 0;
+            }
+            Pattern maxAgePattern = Pattern.compile("max-age\\s*=\\s*(\\d+)");
+            Matcher matcher = maxAgePattern.matcher(cacheControl);
+            if (matcher.find()) {
+                try {
+                    long maxAge = Long.parseLong(matcher.group(1)) * 1000;
+                    if (maxAge <= 0) return 0; // Handle max-age=0
+                    return System.currentTimeMillis() + maxAge;
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid max-age: " + matcher.group(1));
                 }
             }
         }
 
         if (expires != null) {
             try {
-                // Parse Expires header (e.g., "Wed, 21 Oct 2025 07:28:00 GMT")
-                Date expiresDate = new Date(expires);
+                SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
+                format.setTimeZone(TimeZone.getTimeZone("GMT"));
+                Date expiresDate = format.parse(expires);
                 return expiresDate.getTime();
             } catch (Exception e) {
-                // Fallback to default
+                System.err.println("Failed to parse Expires header: " + expires);
             }
         }
 
