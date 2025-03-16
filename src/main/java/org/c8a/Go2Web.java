@@ -20,9 +20,6 @@ public class Go2Web {
     }
 
     public static void main(String[] args) {
-
-//        Runtime.getRuntime().addShutdownHook(new Thread(Go2Web::saveCacheToFile));
-
         if (args.length < 1) {
             showHelp();
             return;
@@ -33,7 +30,7 @@ public class Go2Web {
         switch (flag) {
             case "-u":
                 if (args.length < 2) {
-                    System.out.println("Error: URL is required with -u flag");
+                    System.out.println("\nError: URL is required with -u flag");
                     showHelp();
                     return;
                 }
@@ -43,7 +40,7 @@ public class Go2Web {
 
             case "-s":
                 if (args.length < 2) {
-                    System.out.println("Error: Search term is required with -s flag");
+                    System.out.println("\nError: Search term is required with -s flag");
                     showHelp();
                     return;
                 }
@@ -56,7 +53,7 @@ public class Go2Web {
                 break;
 
             default:
-                System.out.println("Error: Unknown flag: " + flag);
+                System.out.println("\nError: Unknown flag: " + flag);
                 showHelp();
         }
     }
@@ -72,9 +69,9 @@ public class Go2Web {
             loadedCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
 
             cache.putAll(loadedCache);
-            System.out.println("Loaded " + loadedCache.size() + " cache entries from disk");
+            System.out.println("\nLoaded " + loadedCache.size() + " cache entries from disk");
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error loading cache: " + e.getMessage());
+            System.err.println("\nError loading cache: " + e.getMessage());
         }
     }
 
@@ -85,14 +82,26 @@ public class Go2Web {
 
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(CACHE_FILE))) {
             oos.writeObject(cacheCopy);
-            System.out.println("Saved " + cacheCopy.size() + " cache entries to disk");
+            System.out.println("\nSaved " + cacheCopy.size() + " cache entries to disk");
             System.out.println("Cache entries being saved:");
-            cacheCopy.forEach((url, entry) ->
-                    System.out.println(url + " | Expires: " + new Date(entry.getExpirationTime()))
-            );
+            cacheCopy.forEach((url, entry) -> {
+                long remainingMillis = entry.getExpirationTime() - System.currentTimeMillis();
+                String remainingTime = formatDuration(remainingMillis);
+                System.out.println(url + " | Expires: " + new Date(entry.getExpirationTime())
+                        + " (in " + remainingTime + ")");
+            });
         } catch (IOException e) {
-            System.err.println("Error saving cache: " + e.getMessage());
+            System.err.println("\nError saving cache: " + e.getMessage());
         }
+    }
+
+    private static String formatDuration(long millis) {
+        if (millis <= 0) return "EXPIRED";
+        long seconds = millis / 1000;
+        long days = seconds / 86400; seconds %= 86400;
+        long hours = seconds / 3600; seconds %= 3600;
+        long minutes = seconds / 60; seconds %= 60;
+        return String.format("%dd %dh %dm %ds", days, hours, minutes, seconds);
     }
 
     private static void showHelp() {
@@ -114,7 +123,7 @@ public class Go2Web {
             while (true) {
                 CacheEntry cached = cache.get(urlString);
                 if (cached != null && !cached.isExpired()) {
-                    System.out.println("Serving from cache:");
+                    System.out.println("\nServing from cache:");
                     System.out.println(cached.getContent());
                     return;
                 }
@@ -124,7 +133,7 @@ public class Go2Web {
                 int responseCode = connection.getResponseCode();
 
                 if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
-                    System.out.println("Resource not modified. Serving from cache:");
+                    System.out.println("\nResource not modified. Serving from cache:");
                     System.out.println(cached.getContent());
                     return;
                 }
@@ -132,7 +141,7 @@ public class Go2Web {
                 if (responseCode >= 300 && responseCode < 400) {
                     String location = connection.getHeaderField("Location");
                     if (location == null || location.isEmpty()) {
-                        System.out.println("Error: Redirect requested but no Location header found");
+                        System.out.println("\nError: Redirect requested but no Location header found");
                         return;
                     }
 
@@ -143,15 +152,15 @@ public class Go2Web {
                     connection.disconnect();
 
                     if (redirectCount++ >= MAX_REDIRECTS) {
-                        System.out.println("Error: Too many redirects (" + MAX_REDIRECTS + " max)");
+                        System.out.println("\nError: Too many redirects (" + MAX_REDIRECTS + " max)");
                         return;
                     }
 
-                    System.out.println("Redirecting to: " + urlString);
+                    System.out.println("\nRedirecting to: " + urlString);
                     continue;
                 }
 
-                System.out.println("Final URL: " + urlString);
+                System.out.println("\nFinal URL: " + urlString);
                 System.out.println("Response Code: " + responseCode);
 
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
@@ -173,19 +182,19 @@ public class Go2Web {
                     long expirationTime = calculateExpirationTime(headers);
                     cache.put(urlString, new CacheEntry(readableContent, headers, expirationTime));
 
-                    System.out.println(readableContent);
-                    saveCacheToFile();
-                    System.out.println("Caching URL: " + urlString);
+                    System.out.println("\n"+readableContent);
+                    System.out.println("\nCaching URL: " + urlString);
                     System.out.println("Cache-Control: " + headers.get("Cache-Control"));
                     System.out.println("Expires: " + headers.get("Expires"));
                     System.out.println("Calculated Expiration: " + new Date(expirationTime));
+                    saveCacheToFile();
                 }
                 break;
             }
         } catch (SocketTimeoutException ste) {
-            System.out.println("Error: Connection timed out. The server is too slow to respond.");
+            System.out.println("\nError: Connection timed out. The server is too slow to respond.");
         } catch (IOException e) {
-            System.out.println("Error fetching URL: " + e.getMessage());
+            System.out.println("\nError fetching URL: " + e.getMessage());
         }
     }
 
@@ -218,7 +227,7 @@ public class Go2Web {
 
         if (cacheControl != null) {
             if (cacheControl.contains("no-cache") || cacheControl.contains("no-store")) {
-                System.out.println("Cache-Control: no-cache, no-store");
+                System.out.println("\nCache-Control: no-cache, no-store");
                 return 0;
             }
             Pattern maxAgePattern = Pattern.compile("max-age\\s*=\\s*(\\d+)(?:\\s*,|\\s*$)");
@@ -228,12 +237,9 @@ public class Go2Web {
                     String maxAgeStr = matcher.group(1).trim(); // Trim whitespace
                     long maxAge = Long.parseLong(maxAgeStr) * 1000;
                     if (maxAge <= 0) return 0;
-                    System.out.println("Parsed max-age: " + maxAgeStr);
-                    System.out.println("Current time: " + System.currentTimeMillis());
-                    System.out.println("Expiration: " + (System.currentTimeMillis() + maxAge));
                     return System.currentTimeMillis() + maxAge;
                 } catch (NumberFormatException e) {
-                    System.err.println("Invalid max-age: " + matcher.group(1));
+                    System.err.println("\nInvalid max-age: " + matcher.group(1));
                 }
             }
         }
@@ -245,7 +251,7 @@ public class Go2Web {
                 Date expiresDate = format.parse(expires);
                 return expiresDate.getTime();
             } catch (Exception e) {
-                System.err.println("Failed to parse Expires header: " + expires);
+                System.err.println("\nFailed to parse Expires header: " + expires);
             }
         }
 
@@ -357,7 +363,6 @@ public class Go2Web {
 
         String finalResult = result.toString().trim();
 
-        // Replacing multiple consecutive newlines
         finalResult = finalResult.replaceAll("\n{3,}", "\n\n");
 
         return finalResult;
@@ -486,7 +491,7 @@ public class Go2Web {
 
             int responseCode = connection.getResponseCode();
             if (responseCode != 200) {
-                System.out.println("Error: Could not complete search. Response code: " + responseCode);
+                System.out.println("\nError: Could not complete search. Response code: " + responseCode);
                 return;
             }
 
@@ -500,7 +505,7 @@ public class Go2Web {
             in.close();
 
             List<String> searchResults = extractDuckDuckGoResults(response.toString());
-            System.out.println("Top " + Math.min(10, searchResults.size()) + " search results for: " + searchTerm);
+            System.out.println("\nTop " + Math.min(10, searchResults.size()) + " search results for: " + searchTerm);
 
             for (int i = 0; i < Math.min(10, searchResults.size()); i++) {
                 System.out.println((i + 1) + ". " + searchResults.get(i));
@@ -519,17 +524,17 @@ public class Go2Web {
                 int selection = Integer.parseInt(input.trim());
                 if (selection > 0 && selection <= searchResults.size()) {
                     String selectedUrl = searchResults.get(selection - 1);
-                    System.out.println("Fetching URL: " + selectedUrl);
+                    System.out.println("\nFetching URL: " + selectedUrl);
                     fetchURL(selectedUrl);
                 } else if (selection != 0) {
-                    System.out.println("Invalid selection: " + selection);
+                    System.out.println("\nInvalid selection: " + selection);
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number.");
+                System.out.println("\nInvalid input. Please enter a number.");
             }
 
         } catch (IOException e) {
-            System.out.println("Error during search: " + e.getMessage());
+            System.out.println("\nError during search: " + e.getMessage());
         }
     }
 
