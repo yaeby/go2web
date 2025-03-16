@@ -87,7 +87,6 @@ public class Go2Web {
             String htmlContent = response.toString();
             String readableContent = extractReadableContent(htmlContent);
 
-            System.out.println("Human-Readable Content:");
             System.out.println(readableContent);
 
         } catch (IOException e) {
@@ -96,16 +95,78 @@ public class Go2Web {
     }
 
     private static String extractReadableContent(String html) {
-        String noScript = html.replaceAll("<script[^>]*>[\\s\\S]*?</script>", "");
-        String noStyle = noScript.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "");
+        StringBuilder result = new StringBuilder();
 
-        String noComments = noStyle.replaceAll("<!--[\\s\\S]*?-->", "");
-        String noTags = noComments.replaceAll("<[^>]+>", " ");
-        String singleSpaced = noTags.replaceAll("\\s+", " ");
-        String cleanedText = singleSpaced.replaceAll("\\n+", "\n");
-        cleanedText = cleanedText.trim();
+        // First, remove scripts, styles, and comments
+        String cleanHtml = html.replaceAll("<script[^>]*>[\\s\\S]*?</script>", "");
+        cleanHtml = cleanHtml.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "");
+        cleanHtml = cleanHtml.replaceAll("<!--[\\s\\S]*?-->", "");
 
-        return cleanedText;
+        // Replace some common HTML tags with CLI-friendly formatting
+        // Replace headings with uppercase text and newlines
+        cleanHtml = cleanHtml.replaceAll("<h1[^>]*>(.*?)</h1>", "\n\n$1\n==========\n");
+        cleanHtml = cleanHtml.replaceAll("<h2[^>]*>(.*?)</h2>", "\n\n$1\n----------\n");
+        cleanHtml = cleanHtml.replaceAll("<h3[^>]*>(.*?)</h3>", "\n\n$1\n");
+        cleanHtml = cleanHtml.replaceAll("<h4[^>]*>(.*?)</h4>", "\n\n$1:\n");
+        cleanHtml = cleanHtml.replaceAll("<h5[^>]*>(.*?)</h5>", "\n\n$1:\n");
+        cleanHtml = cleanHtml.replaceAll("<h6[^>]*>(.*?)</h6>", "\n\n$1:\n");
+
+        // Replace paragraphs with newlines
+        cleanHtml = cleanHtml.replaceAll("<p[^>]*>(.*?)</p>", "\n$1\n");
+
+        // Handle lists
+        cleanHtml = cleanHtml.replaceAll("<ul[^>]*>|</ul>", "\n");
+        cleanHtml = cleanHtml.replaceAll("<ol[^>]*>|</ol>", "\n");
+        cleanHtml = cleanHtml.replaceAll("<li[^>]*>(.*?)</li>", "\n  • $1");
+
+        // Handle line breaks
+        cleanHtml = cleanHtml.replaceAll("<br[^>]*>", "\n");
+
+        // Handle links (show text and URL)
+        cleanHtml = cleanHtml.replaceAll("<a[^>]*href=[\"']([^\"']*)[\"'][^>]*>(.*?)</a>", "$2 [$1]");
+
+        // Handle tables - simplify to text
+        cleanHtml = cleanHtml.replaceAll("<tr[^>]*>", "\n");
+        cleanHtml = cleanHtml.replaceAll("<td[^>]*>(.*?)</td>", "$1\t");
+        cleanHtml = cleanHtml.replaceAll("<th[^>]*>(.*?)</th>", "$1\t");
+
+        // Remove all remaining HTML tags
+        cleanHtml = cleanHtml.replaceAll("<[^>]+>", "");
+
+        // Decode HTML entities
+        cleanHtml = decodeHtmlEntities(cleanHtml);
+
+        // Fix spacing issues
+        cleanHtml = cleanHtml.replaceAll("\\s+", " ");
+
+        // Fix line breaks - ensure we have proper line breaks
+        cleanHtml = cleanHtml.replaceAll(" \n", "\n");
+        cleanHtml = cleanHtml.replaceAll("\n ", "\n");
+        cleanHtml = cleanHtml.replaceAll("\n+", "\n\n");
+
+        // Trim leading/trailing whitespace
+        cleanHtml = cleanHtml.trim();
+
+        return cleanHtml;
+    }
+
+    private static String decodeHtmlEntities(String html) {
+        return html.replaceAll("&lt;", "<")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&amp;", "&")
+                .replaceAll("&quot;", "\"")
+                .replaceAll("&apos;", "'")
+                .replaceAll("&nbsp;", " ")
+                .replaceAll("&#39;", "'")
+                .replaceAll("&#34;", "\"")
+                .replaceAll("&#160;", " ")
+                .replaceAll("&ldquo;", "\"")
+                .replaceAll("&rdquo;", "\"")
+                .replaceAll("&lsquo;", "'")
+                .replaceAll("&rsquo;", "'")
+                .replaceAll("&mdash;", "—")
+                .replaceAll("&ndash;", "–")
+                .replaceAll("&hellip;", "...");
     }
 
     private static void searchDuckDuckGo(String searchTerm) {
@@ -145,6 +206,24 @@ public class Go2Web {
 
             if (searchResults.isEmpty()) {
                 System.out.println("No results found or could not parse results properly.");
+                return;
+            }
+
+            System.out.println("\nEnter a number (1-" + Math.min(10, searchResults.size()) + ") to fetch that URL, or 0 to go exit: ");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            String input = reader.readLine();
+
+            try {
+                int selection = Integer.parseInt(input.trim());
+                if (selection > 0 && selection <= searchResults.size()) {
+                    String selectedUrl = searchResults.get(selection - 1);
+                    System.out.println("Fetching URL: " + selectedUrl);
+                    fetchURL(selectedUrl);
+                } else if (selection != 0) {
+                    System.out.println("Invalid selection: " + selection);
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a number.");
             }
 
         } catch (IOException e) {
