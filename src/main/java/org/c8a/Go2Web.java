@@ -69,7 +69,8 @@ public class Go2Web {
             URL url = new URL(urlString);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Go2Web/1.0");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
+            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
 
             int responseCode = connection.getResponseCode();
             System.out.println("Response Code: " + responseCode);
@@ -83,12 +84,28 @@ public class Go2Web {
             }
             in.close();
 
-            System.out.println("Response:");
-            System.out.println(response.toString());
+            String htmlContent = response.toString();
+            String readableContent = extractReadableContent(htmlContent);
+
+            System.out.println("Human-Readable Content:");
+            System.out.println(readableContent);
 
         } catch (IOException e) {
             System.out.println("Error fetching URL: " + e.getMessage());
         }
+    }
+
+    private static String extractReadableContent(String html) {
+        String noScript = html.replaceAll("<script[^>]*>[\\s\\S]*?</script>", "");
+        String noStyle = noScript.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "");
+
+        String noComments = noStyle.replaceAll("<!--[\\s\\S]*?-->", "");
+        String noTags = noComments.replaceAll("<[^>]+>", " ");
+        String singleSpaced = noTags.replaceAll("\\s+", " ");
+        String cleanedText = singleSpaced.replaceAll("\\n+", "\n");
+        cleanedText = cleanedText.trim();
+
+        return cleanedText;
     }
 
     private static void searchDuckDuckGo(String searchTerm) {
