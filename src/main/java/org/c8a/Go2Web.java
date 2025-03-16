@@ -70,18 +70,7 @@ public class Go2Web {
             }
 
             while (true) {
-                URL url = new URL(urlString);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(10000);
-
-                connection.setInstanceFollowRedirects(false);
-
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-                connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-                connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+                HttpURLConnection connection = getHttpURLConnection(urlString);
 
                 int responseCode = connection.getResponseCode();
 
@@ -132,11 +121,25 @@ public class Go2Web {
         }
     }
 
+    private static HttpURLConnection getHttpURLConnection(String urlString) throws IOException {
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(10000);
+
+        connection.setInstanceFollowRedirects(false);
+
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+        connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+        return connection;
+    }
+
     private static String repeatChar(char ch, int count) {
         StringBuilder sb = new StringBuilder(count);
-        for (int i = 0; i < count; i++) {
-            sb.append(ch);
-        }
+        sb.append(String.valueOf(ch).repeat(Math.max(0, count)));
         return sb.toString();
     }
 
