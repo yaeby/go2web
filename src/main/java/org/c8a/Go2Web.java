@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -67,9 +68,29 @@ public class Go2Web {
 
             URL url = new URL(urlString);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+
             connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
             connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+            connection.setInstanceFollowRedirects(true);
+
+            int status = connection.getResponseCode();
+            if (status == HttpURLConnection.HTTP_MOVED_TEMP
+                    || status == HttpURLConnection.HTTP_MOVED_PERM
+                    || status == HttpURLConnection.HTTP_SEE_OTHER) {
+
+                String newUrl = connection.getHeaderField("Location");
+                connection = (HttpURLConnection) new URL(newUrl).openConnection();
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+                connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+                connection.setInstanceFollowRedirects(true);
+            }
 
             int responseCode = connection.getResponseCode();
             System.out.println("Response Code: " + responseCode);
@@ -87,7 +108,8 @@ public class Go2Web {
             String readableContent = extractReadableContent(htmlContent);
 
             System.out.println(readableContent);
-
+        } catch (SocketTimeoutException ste) {
+            System.out.println("Error: Connection timed out. The server is too slow to respond.");
         } catch (IOException e) {
             System.out.println("Error fetching URL: " + e.getMessage());
         }
