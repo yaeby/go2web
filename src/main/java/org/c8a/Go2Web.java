@@ -8,7 +8,9 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -94,64 +96,252 @@ public class Go2Web {
         }
     }
 
+    /**
+     * Helper method to repeat a character to create underlines/dividers
+     * (Replacement for String.repeat() which is only available in Java 11+)
+     */
+    private static String repeatChar(char ch, int count) {
+        StringBuilder sb = new StringBuilder(count);
+        for (int i = 0; i < count; i++) {
+            sb.append(ch);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Extracts readable content from HTML by selectively processing important elements
+     */
     private static String extractReadableContent(String html) {
         StringBuilder result = new StringBuilder();
 
-        // First, remove scripts, styles, and comments
+        // First, remove scripts, styles, and other non-content elements
         String cleanHtml = html.replaceAll("<script[^>]*>[\\s\\S]*?</script>", "");
         cleanHtml = cleanHtml.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "");
+        cleanHtml = cleanHtml.replaceAll("<nav[^>]*>[\\s\\S]*?</nav>", "");
+        cleanHtml = cleanHtml.replaceAll("<footer[^>]*>[\\s\\S]*?</footer>", "");
+        cleanHtml = cleanHtml.replaceAll("<header[^>]*>[\\s\\S]*?</header>", "");
         cleanHtml = cleanHtml.replaceAll("<!--[\\s\\S]*?-->", "");
 
-        // Replace some common HTML tags with CLI-friendly formatting
-        // Replace headings with uppercase text and newlines
-        cleanHtml = cleanHtml.replaceAll("<h1[^>]*>(.*?)</h1>", "\n\n$1\n==========\n");
-        cleanHtml = cleanHtml.replaceAll("<h2[^>]*>(.*?)</h2>", "\n\n$1\n----------\n");
-        cleanHtml = cleanHtml.replaceAll("<h3[^>]*>(.*?)</h3>", "\n\n$1\n");
-        cleanHtml = cleanHtml.replaceAll("<h4[^>]*>(.*?)</h4>", "\n\n$1:\n");
-        cleanHtml = cleanHtml.replaceAll("<h5[^>]*>(.*?)</h5>", "\n\n$1:\n");
-        cleanHtml = cleanHtml.replaceAll("<h6[^>]*>(.*?)</h6>", "\n\n$1:\n");
+        // Extract title
+        Pattern titlePattern = Pattern.compile("<title[^>]*>(.*?)</title>", Pattern.DOTALL);
+        Matcher titleMatcher = titlePattern.matcher(cleanHtml);
+        if (titleMatcher.find()) {
+            String title = cleanText(titleMatcher.group(1));
+            if (!title.isBlank()) {
+                result.append(title).append("\n");
+                result.append(repeatChar('=', Math.min(title.length(), 40))).append("\n\n");
+            }
+        }
 
-        // Replace paragraphs with newlines
-        cleanHtml = cleanHtml.replaceAll("<p[^>]*>(.*?)</p>", "\n$1\n");
+        // Extract main content if available (higher priority)
+        Pattern mainPattern = Pattern.compile("<main[^>]*>(.*?)</main>", Pattern.DOTALL);
+        Matcher mainMatcher = mainPattern.matcher(cleanHtml);
+        if (mainMatcher.find()) {
+            // Focus on content in the main tag
+            cleanHtml = mainMatcher.group(1);
+        } else {
+            // Try article tag if main not found
+            Pattern articlePattern = Pattern.compile("<article[^>]*>(.*?)</article>", Pattern.DOTALL);
+            Matcher articleMatcher = articlePattern.matcher(cleanHtml);
+            if (articleMatcher.find()) {
+                cleanHtml = articleMatcher.group(1);
+            }
+        }
 
-        // Handle lists
-        cleanHtml = cleanHtml.replaceAll("<ul[^>]*>|</ul>", "\n");
-        cleanHtml = cleanHtml.replaceAll("<ol[^>]*>|</ol>", "\n");
-        cleanHtml = cleanHtml.replaceAll("<li[^>]*>(.*?)</li>", "\n  • $1");
+        // Extract headings
+        for (int i = 1; i <= 6; i++) {
+            Pattern hPattern = Pattern.compile("<h" + i + "[^>]*>(.*?)</h" + i + ">", Pattern.DOTALL);
+            Matcher hMatcher = hPattern.matcher(cleanHtml);
+            while (hMatcher.find()) {
+                String heading = cleanText(hMatcher.group(1));
+                if (!heading.isEmpty() && heading.trim().length() > 0) {
+                    result.append(heading).append("\n");
+                    if (i <= 2) {
+                        // Add underline for h1 and h2
+                        result.append(repeatChar(i == 1 ? '=' : '-', Math.min(heading.length(), 40))).append("\n");
+                    }
+                    result.append("\n");
+                }
+            }
+        }
 
-        // Handle line breaks
-        cleanHtml = cleanHtml.replaceAll("<br[^>]*>", "\n");
+        // Extract paragraphs
+        Pattern pPattern = Pattern.compile("<p[^>]*>(.*?)</p>", Pattern.DOTALL);
+        Matcher pMatcher = pPattern.matcher(cleanHtml);
+        while (pMatcher.find()) {
+            String paragraph = cleanText(pMatcher.group(1));
+            if (!paragraph.isEmpty() && paragraph.trim().length() > 0) {
+                result.append(paragraph).append("\n\n");
+            }
+        }
 
-        // Handle links (show text and URL)
-        cleanHtml = cleanHtml.replaceAll("<a[^>]*href=[\"']([^\"']*)[\"'][^>]*>(.*?)</a>", "$2 [$1]");
+        // Extract lists
+        extractLists(cleanHtml, result);
 
-        // Handle tables - simplify to text
-        cleanHtml = cleanHtml.replaceAll("<tr[^>]*>", "\n");
-        cleanHtml = cleanHtml.replaceAll("<td[^>]*>(.*?)</td>", "$1\t");
-        cleanHtml = cleanHtml.replaceAll("<th[^>]*>(.*?)</th>", "$1\t");
+        // Extract tables
+        extractTables(cleanHtml, result);
 
-        // Remove all remaining HTML tags
-        cleanHtml = cleanHtml.replaceAll("<[^>]+>", "");
+        // If we have very little content so far, try getting content from divs
+        if (result.length() < 200) {
+            Set<String> processedContents = new HashSet<>();
+            // Focus on divs with content-related classes
+            Pattern contentDivPattern = Pattern.compile("<div[^>]*class=[\"'][^\"']*(?:content|article|text|body)[^\"']*[\"'][^>]*>(.*?)</div>", Pattern.DOTALL);
+            Matcher contentDivMatcher = contentDivPattern.matcher(cleanHtml);
 
-        // Decode HTML entities
-        cleanHtml = decodeHtmlEntities(cleanHtml);
+            while (contentDivMatcher.find()) {
+                String divContent = contentDivMatcher.group(1);
+                if (!divContent.contains("<div")) {  // Skip nested divs
+                    String cleaned = cleanText(divContent);
+                    if (!cleaned.isEmpty() && cleaned.trim().length() > 0 && !processedContents.contains(cleaned)) {
+                        processedContents.add(cleaned);
+                        result.append(cleaned).append("\n\n");
+                    }
+                }
+            }
 
-        // Fix spacing issues
-        cleanHtml = cleanHtml.replaceAll("\\s+", " ");
+            // If still not enough, try generic divs
+            if (result.length() < 200) {
+                Pattern divPattern = Pattern.compile("<div[^>]*>(.*?)</div>", Pattern.DOTALL);
+                Matcher divMatcher = divPattern.matcher(cleanHtml);
 
-        // Fix line breaks - ensure we have proper line breaks
-        cleanHtml = cleanHtml.replaceAll(" \n", "\n");
-        cleanHtml = cleanHtml.replaceAll("\n ", "\n");
-        cleanHtml = cleanHtml.replaceAll("\n+", "\n\n");
+                while (divMatcher.find() && result.length() < 1000) {
+                    String divContent = divMatcher.group(1);
+                    if (!divContent.contains("<div")) {  // Skip nested divs
+                        String cleaned = cleanText(divContent);
+                        if (!cleaned.isEmpty() && cleaned.trim().length() > 40 && !processedContents.contains(cleaned)) {
+                            processedContents.add(cleaned);
+                            result.append(cleaned).append("\n\n");
+                        }
+                    }
+                }
+            }
+        }
 
-        // Trim leading/trailing whitespace
-        cleanHtml = cleanHtml.trim();
+        // If we still don't have much content, fall back to the whole body
+        if (result.length() < 100) {
+            Pattern bodyPattern = Pattern.compile("<body[^>]*>(.*?)</body>", Pattern.DOTALL);
+            Matcher bodyMatcher = bodyPattern.matcher(html);
+            if (bodyMatcher.find()) {
+                String bodyContent = cleanText(bodyMatcher.group(1));
+                if (!bodyContent.isEmpty() && bodyContent.trim().length() > 0) {
+                    result.append(bodyContent);
+                }
+            }
+        }
 
-        return cleanHtml;
+        String finalResult = result.toString().trim();
+
+        // Fix multiple consecutive newlines
+        finalResult = finalResult.replaceAll("\n{3,}", "\n\n");
+
+        return finalResult;
     }
 
-    private static String decodeHtmlEntities(String html) {
-        return html.replaceAll("&lt;", "<")
+    /**
+     * Extract and format lists (both ordered and unordered)
+     */
+    private static void extractLists(String html, StringBuilder result) {
+        // Extract unordered lists
+        Pattern ulPattern = Pattern.compile("<ul[^>]*>(.*?)</ul>", Pattern.DOTALL);
+        Matcher ulMatcher = ulPattern.matcher(html);
+
+        while (ulMatcher.find()) {
+            String ulContent = ulMatcher.group(1);
+            result.append("\n");
+
+            Pattern liPattern = Pattern.compile("<li[^>]*>(.*?)</li>", Pattern.DOTALL);
+            Matcher liMatcher = liPattern.matcher(ulContent);
+
+            while (liMatcher.find()) {
+                String item = cleanText(liMatcher.group(1));
+                if (!item.isEmpty() && item.trim().length() > 0) {
+                    result.append("• ").append(item).append("\n");
+                }
+            }
+            result.append("\n");
+        }
+
+        // Extract ordered lists
+        Pattern olPattern = Pattern.compile("<ol[^>]*>(.*?)</ol>", Pattern.DOTALL);
+        Matcher olMatcher = olPattern.matcher(html);
+
+        while (olMatcher.find()) {
+            String olContent = olMatcher.group(1);
+            result.append("\n");
+
+            Pattern liPattern = Pattern.compile("<li[^>]*>(.*?)</li>", Pattern.DOTALL);
+            Matcher liMatcher = liPattern.matcher(olContent);
+
+            int itemNumber = 1;
+            while (liMatcher.find()) {
+                String item = cleanText(liMatcher.group(1));
+                if (!item.isEmpty() && item.trim().length() > 0) {
+                    result.append(itemNumber++).append(". ").append(item).append("\n");
+                }
+            }
+            result.append("\n");
+        }
+    }
+
+    /**
+     * Extract and format tables
+     */
+    private static void extractTables(String html, StringBuilder result) {
+        Pattern tablePattern = Pattern.compile("<table[^>]*>(.*?)</table>", Pattern.DOTALL);
+        Matcher tableMatcher = tablePattern.matcher(html);
+
+        while (tableMatcher.find()) {
+            String tableContent = tableMatcher.group(1);
+            result.append("\n");
+
+            // Extract rows
+            Pattern trPattern = Pattern.compile("<tr[^>]*>(.*?)</tr>", Pattern.DOTALL);
+            Matcher trMatcher = trPattern.matcher(tableContent);
+
+            while (trMatcher.find()) {
+                String rowContent = trMatcher.group(1);
+                StringBuilder rowText = new StringBuilder();
+
+                // Extract headers
+                Pattern thPattern = Pattern.compile("<th[^>]*>(.*?)</th>", Pattern.DOTALL);
+                Matcher thMatcher = thPattern.matcher(rowContent);
+                boolean isHeader = thMatcher.find();
+
+                if (isHeader) {
+                    do {
+                        String cell = cleanText(thMatcher.group(1));
+                        rowText.append(cell).append("\t");
+                    } while (thMatcher.find());
+
+                    result.append(rowText.toString().trim()).append("\n");
+                    result.append(repeatChar('-', Math.min(rowText.length(), 40))).append("\n");
+                } else {
+                    // Extract data cells
+                    Pattern tdPattern = Pattern.compile("<td[^>]*>(.*?)</td>", Pattern.DOTALL);
+                    Matcher tdMatcher = tdPattern.matcher(rowContent);
+
+                    while (tdMatcher.find()) {
+                        String cell = cleanText(tdMatcher.group(1));
+                        rowText.append(cell).append("\t");
+                    }
+
+                    result.append(rowText.toString().trim()).append("\n");
+                }
+            }
+
+            result.append("\n");
+        }
+    }
+
+    /**
+     * Clean HTML text by removing tags and decoding entities
+     */
+    private static String cleanText(String text) {
+        // Remove any remaining HTML tags
+        String noTags = text.replaceAll("<[^>]+>", " ");
+
+        // Decode common HTML entities
+        String decoded = noTags.replaceAll("&lt;", "<")
                 .replaceAll("&gt;", ">")
                 .replaceAll("&amp;", "&")
                 .replaceAll("&quot;", "\"")
@@ -165,8 +355,13 @@ public class Go2Web {
                 .replaceAll("&lsquo;", "'")
                 .replaceAll("&rsquo;", "'")
                 .replaceAll("&mdash;", "—")
-                .replaceAll("&ndash;", "–")
+                .replaceAll("&ndash;", "-")
                 .replaceAll("&hellip;", "...");
+
+        // Normalize whitespace
+        String normalized = decoded.replaceAll("\\s+", " ").trim();
+
+        return normalized;
     }
 
     private static void searchDuckDuckGo(String searchTerm) {
