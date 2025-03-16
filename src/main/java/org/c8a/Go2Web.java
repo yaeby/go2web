@@ -171,10 +171,21 @@ public class Go2Web {
                         response.append(inputLine).append("\n");
                     }
 
-                    String htmlContent = response.toString();
-                    String readableContent = extractReadableContent(htmlContent);
+//                    String htmlContent = response.toString();
+//                    String readableContent = extractReadableContent(htmlContent);
+                    String contentType = connection.getContentType().split(";")[0].trim();
+                    String readableContent;
+
+                    if ("application/json".equals(contentType)) {
+                        readableContent = response.toString();
+                    } else {
+                        // Default to HTML processing
+                        String htmlContent = response.toString();
+                        readableContent = extractReadableContent(htmlContent);
+                    }
 
                     Map<String, String> headers = new HashMap<>();
+                    headers.put("Content-Type", contentType);
                     headers.put("ETag", connection.getHeaderField("ETag"));
                     headers.put("Last-Modified", connection.getHeaderField("Last-Modified"));
                     headers.put("Cache-Control", connection.getHeaderField("Cache-Control"));
@@ -215,7 +226,8 @@ public class Go2Web {
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("GET");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+//        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+        connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
         connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
         return connection;
     }
@@ -485,7 +497,8 @@ public class Go2Web {
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
-            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+//            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
             connection.setRequestProperty("Connection", "keep-alive");
 
