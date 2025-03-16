@@ -1,8 +1,6 @@
 package org.c8a;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
@@ -15,8 +13,16 @@ import java.util.regex.Pattern;
 
 public class Go2Web {
     private static final Map<String, CacheEntry> cache = new HashMap<>();
+    private static final String CACHE_FILE = "go2web_cache.dat";
+
+    static {
+        loadCacheFromFile();
+    }
 
     public static void main(String[] args) {
+
+        Runtime.getRuntime().addShutdownHook(new Thread(Go2Web::saveCacheToFile));
+
         if (args.length < 1) {
             showHelp();
             return;
@@ -55,6 +61,36 @@ public class Go2Web {
         }
     }
 
+    private static void loadCacheFromFile() {
+        File file = new File(CACHE_FILE);
+        if (!file.exists()) return;
+
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(CACHE_FILE))) {
+            @SuppressWarnings("unchecked")
+            Map<String, CacheEntry> loadedCache = (Map<String, CacheEntry>) ois.readObject();
+
+            loadedCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+
+            cache.putAll(loadedCache);
+            System.out.println("Loaded " + loadedCache.size() + " cache entries from disk");
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error loading cache: " + e.getMessage());
+        }
+    }
+
+    private static void saveCacheToFile() {
+        Map<String, CacheEntry> cacheCopy = new HashMap<>(cache);
+
+        cacheCopy.entrySet().removeIf(entry -> entry.getValue().isExpired());
+
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(CACHE_FILE))) {
+            oos.writeObject(cacheCopy);
+            System.out.println("Saved " + cacheCopy.size() + " cache entries to disk");
+        } catch (IOException e) {
+            System.err.println("Error saving cache: " + e.getMessage());
+        }
+    }
+
     private static void showHelp() {
         System.out.println("Usage:");
         System.out.println("./go2web -u <URL>         # make an HTTP request to the specified URL and print the response");
@@ -83,6 +119,12 @@ public class Go2Web {
 
                 int responseCode = connection.getResponseCode();
 
+                if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
+                    System.out.println("Resource not modified. Serving from cache:");
+                    System.out.println(cached.getContent());
+                    return;
+                }
+
                 if (responseCode >= 300 && responseCode < 400) {
                     String location = connection.getHeaderField("Location");
                     if (location == null || location.isEmpty()) {
@@ -105,15 +147,8 @@ public class Go2Web {
                     continue;
                 }
 
-                if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
-                    System.out.println("Resource not modified. Serving from cache:");
-                    System.out.println(cached.getContent());
-                    return;
-                }
-                else {
-                    System.out.println("Final URL: " + urlString);
-                    System.out.println("Response Code: " + responseCode);
-                }
+                System.out.println("Final URL: " + urlString);
+                System.out.println("Response Code: " + responseCode);
 
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                     String inputLine;
