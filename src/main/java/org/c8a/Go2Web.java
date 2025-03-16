@@ -96,10 +96,6 @@ public class Go2Web {
         }
     }
 
-    /**
-     * Helper method to repeat a character to create underlines/dividers
-     * (Replacement for String.repeat() which is only available in Java 11+)
-     */
     private static String repeatChar(char ch, int count) {
         StringBuilder sb = new StringBuilder(count);
         for (int i = 0; i < count; i++) {
@@ -108,13 +104,9 @@ public class Go2Web {
         return sb.toString();
     }
 
-    /**
-     * Extracts readable content from HTML by selectively processing important elements
-     */
     private static String extractReadableContent(String html) {
         StringBuilder result = new StringBuilder();
 
-        // First, remove scripts, styles, and other non-content elements
         String cleanHtml = html.replaceAll("<script[^>]*>[\\s\\S]*?</script>", "");
         cleanHtml = cleanHtml.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "");
         cleanHtml = cleanHtml.replaceAll("<nav[^>]*>[\\s\\S]*?</nav>", "");
@@ -122,7 +114,6 @@ public class Go2Web {
         cleanHtml = cleanHtml.replaceAll("<header[^>]*>[\\s\\S]*?</header>", "");
         cleanHtml = cleanHtml.replaceAll("<!--[\\s\\S]*?-->", "");
 
-        // Extract title
         Pattern titlePattern = Pattern.compile("<title[^>]*>(.*?)</title>", Pattern.DOTALL);
         Matcher titleMatcher = titlePattern.matcher(cleanHtml);
         if (titleMatcher.find()) {
@@ -133,14 +124,11 @@ public class Go2Web {
             }
         }
 
-        // Extract main content if available (higher priority)
         Pattern mainPattern = Pattern.compile("<main[^>]*>(.*?)</main>", Pattern.DOTALL);
         Matcher mainMatcher = mainPattern.matcher(cleanHtml);
         if (mainMatcher.find()) {
-            // Focus on content in the main tag
             cleanHtml = mainMatcher.group(1);
         } else {
-            // Try article tag if main not found
             Pattern articlePattern = Pattern.compile("<article[^>]*>(.*?)</article>", Pattern.DOTALL);
             Matcher articleMatcher = articlePattern.matcher(cleanHtml);
             if (articleMatcher.find()) {
@@ -148,7 +136,6 @@ public class Go2Web {
             }
         }
 
-        // Extract headings
         for (int i = 1; i <= 6; i++) {
             Pattern hPattern = Pattern.compile("<h" + i + "[^>]*>(.*?)</h" + i + ">", Pattern.DOTALL);
             Matcher hMatcher = hPattern.matcher(cleanHtml);
@@ -157,7 +144,6 @@ public class Go2Web {
                 if (!heading.isEmpty() && heading.trim().length() > 0) {
                     result.append(heading).append("\n");
                     if (i <= 2) {
-                        // Add underline for h1 and h2
                         result.append(repeatChar(i == 1 ? '=' : '-', Math.min(heading.length(), 40))).append("\n");
                     }
                     result.append("\n");
@@ -165,7 +151,6 @@ public class Go2Web {
             }
         }
 
-        // Extract paragraphs
         Pattern pPattern = Pattern.compile("<p[^>]*>(.*?)</p>", Pattern.DOTALL);
         Matcher pMatcher = pPattern.matcher(cleanHtml);
         while (pMatcher.find()) {
@@ -175,16 +160,11 @@ public class Go2Web {
             }
         }
 
-        // Extract lists
         extractLists(cleanHtml, result);
-
-        // Extract tables
         extractTables(cleanHtml, result);
 
-        // If we have very little content so far, try getting content from divs
         if (result.length() < 200) {
             Set<String> processedContents = new HashSet<>();
-            // Focus on divs with content-related classes
             Pattern contentDivPattern = Pattern.compile("<div[^>]*class=[\"'][^\"']*(?:content|article|text|body)[^\"']*[\"'][^>]*>(.*?)</div>", Pattern.DOTALL);
             Matcher contentDivMatcher = contentDivPattern.matcher(cleanHtml);
 
@@ -199,7 +179,6 @@ public class Go2Web {
                 }
             }
 
-            // If still not enough, try generic divs
             if (result.length() < 200) {
                 Pattern divPattern = Pattern.compile("<div[^>]*>(.*?)</div>", Pattern.DOTALL);
                 Matcher divMatcher = divPattern.matcher(cleanHtml);
@@ -217,7 +196,6 @@ public class Go2Web {
             }
         }
 
-        // If we still don't have much content, fall back to the whole body
         if (result.length() < 100) {
             Pattern bodyPattern = Pattern.compile("<body[^>]*>(.*?)</body>", Pattern.DOTALL);
             Matcher bodyMatcher = bodyPattern.matcher(html);
@@ -231,17 +209,13 @@ public class Go2Web {
 
         String finalResult = result.toString().trim();
 
-        // Fix multiple consecutive newlines
+        // Replacing multiple consecutive newlines
         finalResult = finalResult.replaceAll("\n{3,}", "\n\n");
 
         return finalResult;
     }
 
-    /**
-     * Extract and format lists (both ordered and unordered)
-     */
     private static void extractLists(String html, StringBuilder result) {
-        // Extract unordered lists
         Pattern ulPattern = Pattern.compile("<ul[^>]*>(.*?)</ul>", Pattern.DOTALL);
         Matcher ulMatcher = ulPattern.matcher(html);
 
@@ -261,7 +235,6 @@ public class Go2Web {
             result.append("\n");
         }
 
-        // Extract ordered lists
         Pattern olPattern = Pattern.compile("<ol[^>]*>(.*?)</ol>", Pattern.DOTALL);
         Matcher olMatcher = olPattern.matcher(html);
 
@@ -283,9 +256,6 @@ public class Go2Web {
         }
     }
 
-    /**
-     * Extract and format tables
-     */
     private static void extractTables(String html, StringBuilder result) {
         Pattern tablePattern = Pattern.compile("<table[^>]*>(.*?)</table>", Pattern.DOTALL);
         Matcher tableMatcher = tablePattern.matcher(html);
@@ -294,7 +264,6 @@ public class Go2Web {
             String tableContent = tableMatcher.group(1);
             result.append("\n");
 
-            // Extract rows
             Pattern trPattern = Pattern.compile("<tr[^>]*>(.*?)</tr>", Pattern.DOTALL);
             Matcher trMatcher = trPattern.matcher(tableContent);
 
@@ -302,7 +271,6 @@ public class Go2Web {
                 String rowContent = trMatcher.group(1);
                 StringBuilder rowText = new StringBuilder();
 
-                // Extract headers
                 Pattern thPattern = Pattern.compile("<th[^>]*>(.*?)</th>", Pattern.DOTALL);
                 Matcher thMatcher = thPattern.matcher(rowContent);
                 boolean isHeader = thMatcher.find();
@@ -316,7 +284,6 @@ public class Go2Web {
                     result.append(rowText.toString().trim()).append("\n");
                     result.append(repeatChar('-', Math.min(rowText.length(), 40))).append("\n");
                 } else {
-                    // Extract data cells
                     Pattern tdPattern = Pattern.compile("<td[^>]*>(.*?)</td>", Pattern.DOTALL);
                     Matcher tdMatcher = tdPattern.matcher(rowContent);
 
@@ -333,14 +300,9 @@ public class Go2Web {
         }
     }
 
-    /**
-     * Clean HTML text by removing tags and decoding entities
-     */
     private static String cleanText(String text) {
-        // Remove any remaining HTML tags
         String noTags = text.replaceAll("<[^>]+>", " ");
 
-        // Decode common HTML entities
         String decoded = noTags.replaceAll("&lt;", "<")
                 .replaceAll("&gt;", ">")
                 .replaceAll("&amp;", "&")
