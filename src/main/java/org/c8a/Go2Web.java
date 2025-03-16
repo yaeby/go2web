@@ -40,7 +40,7 @@ public class Go2Web {
                     return;
                 }
                 String searchTerm = args[1];
-                searchGoogle(searchTerm);
+                searchDuckDuckGo(searchTerm);
                 break;
 
             case "-h":
@@ -91,23 +91,25 @@ public class Go2Web {
         }
     }
 
-    private static void searchGoogle(String searchTerm) {
+    private static void searchDuckDuckGo(String searchTerm) {
         try {
             String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8.toString());
-            System.out.printf("Search term: %s\n", encodedSearchTerm);
-            String searchUrl = "https://www.google.com/search?q=" + encodedSearchTerm;
+            String searchUrl = "https://html.duckduckgo.com/html/?q=" + encodedSearchTerm;
 
             URL url = new URL(searchUrl);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
+            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+            connection.setRequestProperty("Connection", "keep-alive");
 
             int responseCode = connection.getResponseCode();
             if (responseCode != 200) {
                 System.out.println("Error: Could not complete search. Response code: " + responseCode);
                 return;
             }
-            System.out.println(connection.getResponseMessage());
+
             BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
             String inputLine;
             StringBuilder response = new StringBuilder();
@@ -116,8 +118,8 @@ public class Go2Web {
                 response.append(inputLine);
             }
             in.close();
-            System.out.println("Response: " + response);
-            List<String> searchResults = extractSearchResults(response.toString());
+
+            List<String> searchResults = extractDuckDuckGoResults(response.toString());
             System.out.println("Top " + Math.min(10, searchResults.size()) + " search results for: " + searchTerm);
 
             for (int i = 0; i < Math.min(10, searchResults.size()); i++) {
@@ -133,17 +135,18 @@ public class Go2Web {
         }
     }
 
-    private static List<String> extractSearchResults(String html) {
+    private static List<String> extractDuckDuckGoResults(String html) {
         List<String> results = new ArrayList<>();
 
-        Pattern pattern = Pattern.compile("<a href=\"/url\\?q=([^&]+)&amp;");
+        Pattern pattern = Pattern.compile("<a class=\"result__url\" href=\"([^\"]+)\"");
         Matcher matcher = pattern.matcher(html);
 
         while (matcher.find() && results.size() < 10) {
             String url = matcher.group(1);
-            if (!url.contains("google.com")) {
-                results.add(url);
+            if (url.startsWith("//")) {
+                url = "https:" + url;
             }
+            results.add(url);
         }
 
         return results;
