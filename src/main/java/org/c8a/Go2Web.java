@@ -61,53 +61,78 @@ public class Go2Web {
     }
 
     private static void fetchURL(String urlString) {
+        final int MAX_REDIRECTS = 5;
+        int redirectCount = 0;
+
         try {
             if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) {
                 urlString = "https://" + urlString;
             }
 
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            while (true) {
+                URL url = new URL(urlString);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
+                // Timeout settings (10 seconds)
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
 
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-            connection.setInstanceFollowRedirects(true);
+                // Disable automatic redirect following
+                connection.setInstanceFollowRedirects(false);
 
-            int status = connection.getResponseCode();
-            if (status == HttpURLConnection.HTTP_MOVED_TEMP
-                    || status == HttpURLConnection.HTTP_MOVED_PERM
-                    || status == HttpURLConnection.HTTP_SEE_OTHER) {
-
-                String newUrl = connection.getHeaderField("Location");
-                connection = (HttpURLConnection) new URL(newUrl).openConnection();
+                // Set request headers
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
                 connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
                 connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-                connection.setInstanceFollowRedirects(true);
+
+                int responseCode = connection.getResponseCode();
+
+                // Check for redirect (3xx status codes)
+                if (responseCode >= 300 && responseCode < 400) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null || location.isEmpty()) {
+                        System.out.println("Error: Redirect requested but no Location header found");
+                        return;
+                    }
+
+                    // Resolve relative URLs
+                    URL base = new URL(urlString);
+                    URL resolvedUrl = new URL(base, location);
+                    urlString = resolvedUrl.toString();
+
+                    // Close current connection before reopening
+                    connection.disconnect();
+
+                    if (redirectCount++ >= MAX_REDIRECTS) {
+                        System.out.println("Error: Too many redirects (" + MAX_REDIRECTS + " max)");
+                        return;
+                    }
+
+                    System.out.println("Redirecting to: " + urlString);
+                    continue;
+                }
+
+                // Handle non-redirect response
+                System.out.println("Final URL: " + urlString);
+                System.out.println("Response Code: " + responseCode);
+
+                // Read response content
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    String inputLine;
+                    StringBuilder response = new StringBuilder();
+
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine).append("\n");
+                    }
+
+                    String htmlContent = response.toString();
+                    String readableContent = extractReadableContent(htmlContent);
+                    System.out.println(readableContent);
+                }
+
+                break; // Exit loop after successful request
             }
-
-            int responseCode = connection.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
-
-            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine).append("\n");
-            }
-            in.close();
-
-            String htmlContent = response.toString();
-            String readableContent = extractReadableContent(htmlContent);
-
-            System.out.println(readableContent);
         } catch (SocketTimeoutException ste) {
             System.out.println("Error: Connection timed out. The server is too slow to respond.");
         } catch (IOException e) {
