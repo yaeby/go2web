@@ -61,53 +61,59 @@ public class Go2Web {
     }
 
     private static void fetchURL(String urlString) {
+        final int MAX_REDIRECTS = 5;
+        int redirectCount = 0;
+
         try {
             if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) {
                 urlString = "https://" + urlString;
             }
 
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            while (true) {
+                HttpURLConnection connection = getHttpURLConnection(urlString);
 
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
+                int responseCode = connection.getResponseCode();
 
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-            connection.setInstanceFollowRedirects(true);
+                if (responseCode >= 300 && responseCode < 400) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null || location.isEmpty()) {
+                        System.out.println("Error: Redirect requested but no Location header found");
+                        return;
+                    }
 
-            int status = connection.getResponseCode();
-            if (status == HttpURLConnection.HTTP_MOVED_TEMP
-                    || status == HttpURLConnection.HTTP_MOVED_PERM
-                    || status == HttpURLConnection.HTTP_SEE_OTHER) {
+                    URL base = new URL(urlString);
+                    URL resolvedUrl = new URL(base, location);
+                    urlString = resolvedUrl.toString();
 
-                String newUrl = connection.getHeaderField("Location");
-                connection = (HttpURLConnection) new URL(newUrl).openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-                connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-                connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-                connection.setInstanceFollowRedirects(true);
+                    connection.disconnect();
+
+                    if (redirectCount++ >= MAX_REDIRECTS) {
+                        System.out.println("Error: Too many redirects (" + MAX_REDIRECTS + " max)");
+                        return;
+                    }
+
+                    System.out.println("Redirecting to: " + urlString);
+                    continue;
+                }
+
+                System.out.println("Final URL: " + urlString);
+                System.out.println("Response Code: " + responseCode);
+
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    String inputLine;
+                    StringBuilder response = new StringBuilder();
+
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine).append("\n");
+                    }
+
+                    String htmlContent = response.toString();
+                    String readableContent = extractReadableContent(htmlContent);
+                    System.out.println(readableContent);
+                }
+
+                break;
             }
-
-            int responseCode = connection.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
-
-            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine).append("\n");
-            }
-            in.close();
-
-            String htmlContent = response.toString();
-            String readableContent = extractReadableContent(htmlContent);
-
-            System.out.println(readableContent);
         } catch (SocketTimeoutException ste) {
             System.out.println("Error: Connection timed out. The server is too slow to respond.");
         } catch (IOException e) {
@@ -115,12 +121,20 @@ public class Go2Web {
         }
     }
 
-    private static String repeatChar(char ch, int count) {
-        StringBuilder sb = new StringBuilder(count);
-        for (int i = 0; i < count; i++) {
-            sb.append(ch);
-        }
-        return sb.toString();
+    private static HttpURLConnection getHttpURLConnection(String urlString) throws IOException {
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(10000);
+
+        connection.setInstanceFollowRedirects(false);
+
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+        connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+        return connection;
     }
 
     private static String extractReadableContent(String html) {
@@ -139,7 +153,7 @@ public class Go2Web {
             String title = cleanText(titleMatcher.group(1));
             if (!title.isBlank()) {
                 result.append(title).append("\n");
-                result.append(repeatChar('=', Math.min(title.length(), 40))).append("\n\n");
+                result.append(String.valueOf('=').repeat(Math.min(title.length(), 40))).append("\n\n");
             }
         }
 
@@ -160,10 +174,10 @@ public class Go2Web {
             Matcher hMatcher = hPattern.matcher(cleanHtml);
             while (hMatcher.find()) {
                 String heading = cleanText(hMatcher.group(1));
-                if (!heading.isEmpty() && heading.trim().length() > 0) {
+                if (!heading.isEmpty() && !heading.trim().isEmpty()) {
                     result.append(heading).append("\n");
                     if (i <= 2) {
-                        result.append(repeatChar(i == 1 ? '=' : '-', Math.min(heading.length(), 40))).append("\n");
+                        result.append(String.valueOf(i == 1 ? '=' : '-').repeat(Math.min(heading.length(), 40))).append("\n");
                     }
                     result.append("\n");
                 }
@@ -174,7 +188,7 @@ public class Go2Web {
         Matcher pMatcher = pPattern.matcher(cleanHtml);
         while (pMatcher.find()) {
             String paragraph = cleanText(pMatcher.group(1));
-            if (!paragraph.isEmpty() && paragraph.trim().length() > 0) {
+            if (!paragraph.isEmpty() && !paragraph.trim().isEmpty()) {
                 result.append(paragraph).append("\n\n");
             }
         }
@@ -191,7 +205,7 @@ public class Go2Web {
                 String divContent = contentDivMatcher.group(1);
                 if (!divContent.contains("<div")) {  // Skip nested divs
                     String cleaned = cleanText(divContent);
-                    if (!cleaned.isEmpty() && cleaned.trim().length() > 0 && !processedContents.contains(cleaned)) {
+                    if (!cleaned.isEmpty() && !cleaned.trim().isEmpty() && !processedContents.contains(cleaned)) {
                         processedContents.add(cleaned);
                         result.append(cleaned).append("\n\n");
                     }
@@ -220,7 +234,7 @@ public class Go2Web {
             Matcher bodyMatcher = bodyPattern.matcher(html);
             if (bodyMatcher.find()) {
                 String bodyContent = cleanText(bodyMatcher.group(1));
-                if (!bodyContent.isEmpty() && bodyContent.trim().length() > 0) {
+                if (!bodyContent.isEmpty() && !bodyContent.trim().isEmpty()) {
                     result.append(bodyContent);
                 }
             }
@@ -247,7 +261,7 @@ public class Go2Web {
 
             while (liMatcher.find()) {
                 String item = cleanText(liMatcher.group(1));
-                if (!item.isEmpty() && item.trim().length() > 0) {
+                if (!item.isEmpty() && !item.trim().isEmpty()) {
                     result.append("• ").append(item).append("\n");
                 }
             }
@@ -267,7 +281,7 @@ public class Go2Web {
             int itemNumber = 1;
             while (liMatcher.find()) {
                 String item = cleanText(liMatcher.group(1));
-                if (!item.isEmpty() && item.trim().length() > 0) {
+                if (!item.isEmpty() && !item.trim().isEmpty()) {
                     result.append(itemNumber++).append(". ").append(item).append("\n");
                 }
             }
@@ -301,7 +315,7 @@ public class Go2Web {
                     } while (thMatcher.find());
 
                     result.append(rowText.toString().trim()).append("\n");
-                    result.append(repeatChar('-', Math.min(rowText.length(), 40))).append("\n");
+                    result.append(String.valueOf('-').repeat(Math.min(rowText.length(), 40))).append("\n");
                 } else {
                     Pattern tdPattern = Pattern.compile("<td[^>]*>(.*?)</td>", Pattern.DOTALL);
                     Matcher tdMatcher = tdPattern.matcher(rowContent);
@@ -339,15 +353,12 @@ public class Go2Web {
                 .replaceAll("&ndash;", "-")
                 .replaceAll("&hellip;", "...");
 
-        // Normalize whitespace
-        String normalized = decoded.replaceAll("\\s+", " ").trim();
-
-        return normalized;
+        return decoded.replaceAll("\\s+", " ").trim();
     }
 
     private static void searchDuckDuckGo(String searchTerm) {
         try {
-            String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8.toString());
+            String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
             String searchUrl = "https://html.duckduckgo.com/html/?q=" + encodedSearchTerm;
 
             URL url = new URL(searchUrl);
