@@ -21,7 +21,7 @@ public class Go2Web {
 
     public static void main(String[] args) {
 
-        Runtime.getRuntime().addShutdownHook(new Thread(Go2Web::saveCacheToFile));
+//        Runtime.getRuntime().addShutdownHook(new Thread(Go2Web::saveCacheToFile));
 
         if (args.length < 1) {
             showHelp();
@@ -86,6 +86,10 @@ public class Go2Web {
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(CACHE_FILE))) {
             oos.writeObject(cacheCopy);
             System.out.println("Saved " + cacheCopy.size() + " cache entries to disk");
+            System.out.println("Cache entries being saved:");
+            cacheCopy.forEach((url, entry) ->
+                    System.out.println(url + " | Expires: " + new Date(entry.getExpirationTime()))
+            );
         } catch (IOException e) {
             System.err.println("Error saving cache: " + e.getMessage());
         }
@@ -170,8 +174,12 @@ public class Go2Web {
                     cache.put(urlString, new CacheEntry(readableContent, headers, expirationTime));
 
                     System.out.println(readableContent);
+                    saveCacheToFile();
+                    System.out.println("Caching URL: " + urlString);
+                    System.out.println("Cache-Control: " + headers.get("Cache-Control"));
+                    System.out.println("Expires: " + headers.get("Expires"));
+                    System.out.println("Calculated Expiration: " + new Date(expirationTime));
                 }
-
                 break;
             }
         } catch (SocketTimeoutException ste) {
@@ -213,12 +221,16 @@ public class Go2Web {
                 System.out.println("Cache-Control: no-cache, no-store");
                 return 0;
             }
-            Pattern maxAgePattern = Pattern.compile("max-age\\s*=\\s*(\\d+)");
+            Pattern maxAgePattern = Pattern.compile("max-age\\s*=\\s*(\\d+)(?:\\s*,|\\s*$)");
             Matcher matcher = maxAgePattern.matcher(cacheControl);
             if (matcher.find()) {
                 try {
-                    long maxAge = Long.parseLong(matcher.group(1)) * 1000;
-                    if (maxAge <= 0) return 0; // Handle max-age=0
+                    String maxAgeStr = matcher.group(1).trim(); // Trim whitespace
+                    long maxAge = Long.parseLong(maxAgeStr) * 1000;
+                    if (maxAge <= 0) return 0;
+                    System.out.println("Parsed max-age: " + maxAgeStr);
+                    System.out.println("Current time: " + System.currentTimeMillis());
+                    System.out.println("Expiration: " + (System.currentTimeMillis() + maxAge));
                     return System.currentTimeMillis() + maxAge;
                 } catch (NumberFormatException e) {
                     System.err.println("Invalid max-age: " + matcher.group(1));

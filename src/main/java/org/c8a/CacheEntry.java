@@ -19,6 +19,7 @@ public class CacheEntry implements Serializable {
 
     public String getContent() { return content; }
     public Map<String, String> getHeaders() { return headers; }
+    public long getExpirationTime() { return expirationTime; }
     public boolean isExpired() { return System.currentTimeMillis() > expirationTime; }
 }
 
