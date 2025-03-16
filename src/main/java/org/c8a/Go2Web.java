@@ -7,10 +7,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,7 +38,7 @@ public class Go2Web {
                     showHelp();
                     return;
                 }
-                String searchTerm = args[1];
+                String searchTerm = String.join("+", Arrays.copyOfRange(args, 1, args.length));
                 searchDuckDuckGo(searchTerm);
                 break;
 
