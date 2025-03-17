@@ -51,7 +51,16 @@
                 </executions>
                 <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <filters>
+                        <filter>
+                            <artifact>*:*</artifact>
+                            <excludes>
+                                <exclude>META-INF/versions/9/module-info.class</exclude>
+                            </excludes>
+                        </filter>
+                    </filters>
                 </configuration>
+
             </plugin>
         </plugins>
     </build>

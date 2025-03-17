@@ -10,6 +10,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 public class Go2Web {
     private static final Map<String, CacheEntry> cache = new HashMap<>();
@@ -134,6 +136,7 @@ public class Go2Web {
 
                 if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
                     System.out.println("\nResource not modified. Serving from cache:");
+                    assert cached != null;
                     System.out.println(cached.getContent());
                     return;
                 }
@@ -175,11 +178,9 @@ public class Go2Web {
                     String readableContent;
 
                     if ("application/json".equals(contentType)) {
-                        readableContent = response.toString();
+                        readableContent = formatJson(response.toString());
                     } else {
-                        // Default to HTML processing
-                        String htmlContent = response.toString();
-                        readableContent = extractReadableContent(htmlContent);
+                        readableContent = extractReadableContent(response.toString());
                     }
 
                     Map<String, String> headers = new HashMap<>();
@@ -224,7 +225,6 @@ public class Go2Web {
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("GET");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-//        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
         connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
         connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
         return connection;
@@ -565,15 +565,14 @@ public class Go2Web {
         return results;
     }
 
-    //TODO: Implement json formating
-//    private static String formatJson(String json) {
-//        try {
-//            ObjectMapper mapper = new ObjectMapper();
-//            mapper.enable(SerializationFeature.INDENT_OUTPUT);
-//            Object jsonObject = mapper.readValue(json, Object.class);
-//            return mapper.writeValueAsString(jsonObject);
-//        } catch (Exception e) {
-//            return json; // Return raw JSON if parsing fails
-//        }
-//    }
+    private static String formatJson(String json) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+            Object jsonObject = mapper.readValue(json, Object.class);
+            return mapper.writeValueAsString(jsonObject);
+        } catch (Exception e) {
+            return json;
+        }
+    }
 }
