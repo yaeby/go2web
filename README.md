@@ -40,7 +40,8 @@ java -jar "%SCRIPT_DIR%go2web-1.0-SNAPSHOT.jar" %*
 2. Add the `go2web-1.0-SNAPSHOT.jar` to `C:\Program Files\Go2Web\`.
 ```bash
 mv go2web-1.0-SNAPSHOT.jar "C:\Program Files\Go2Web\"
-2. ```
+```
+
 3. Add `C:\Program Files\Go2Web\` to the System PATH
 ```powershell
 [Environment]::SetEnvironmentVariable(
