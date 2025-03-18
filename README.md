@@ -28,9 +28,9 @@ mvn clean package
 ### Windows Execution
 
 After the installation steps on Windows, you can run the program using `./go2web` (a `.bat` is already implemented for you)  
-Or if u want `go2web.bat` callable from anywhere, you can follow the steps:
+Or if u want the `go2web.bat` callable from anywhere, you can follow the steps:
 
-1. Place your `go2web.bat` file in a directory like `C:\Program Files\Go2Web\` and change it content to:
+1. Place your `go2web.bat` file in a directory like `C:\Program Files\Go2Web\` and change its content to:
 ```batch
 @echo off
 set SCRIPT_DIR=%~dp0
