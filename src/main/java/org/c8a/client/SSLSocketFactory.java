@@ -1,6 +1,9 @@
 package org.c8a.client;
 
-import javax.net.ssl.*;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -12,7 +15,6 @@ public class SSLSocketFactory {
 
     public static Socket createSSLSocket(String host, int port, int timeout) throws IOException {
         try {
-            // Create SSL context
             SSLContext sslContext = SSLContext.getInstance("TLS");
 
             TrustManager[] trustAllCerts = new TrustManager[] {

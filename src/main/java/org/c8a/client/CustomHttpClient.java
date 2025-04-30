@@ -115,13 +115,11 @@ public class CustomHttpClient {
     private HttpResponse parseResponse(InputStream in) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 
-        // Read the status line
         String statusLine = reader.readLine();
         if (statusLine == null) {
             throw new IOException("Empty response");
         }
 
-        // Parse status line
         Pattern statusPattern = Pattern.compile("HTTP/\\d\\.\\d (\\d+) (.*)");
         Matcher matcher = statusPattern.matcher(statusLine);
         if (!matcher.matches()) {
@@ -131,7 +129,6 @@ public class CustomHttpClient {
         int statusCode = Integer.parseInt(matcher.group(1));
         String statusMessage = matcher.group(2);
 
-        // Read headers
         Map<String, String> headers = new HashMap<>();
         String line;
         while ((line = reader.readLine()) != null && !line.isEmpty()) {
@@ -145,24 +142,18 @@ public class CustomHttpClient {
             }
         }
 
-        // Check if we have a Content-Length header
         String contentLengthStr = headers.get("content-length");
 
-        // Check for chunked encoding
         boolean isChunked = "chunked".equalsIgnoreCase(headers.get("transfer-encoding"));
 
-        // Read the response body
         ByteArrayOutputStream responseBody = new ByteArrayOutputStream();
 
         if (isChunked) {
-            // Handle chunked transfer-encoding
             readChunkedBody(reader, responseBody);
         } else if (contentLengthStr != null) {
-            // Handle fixed-length content
             int contentLength = Integer.parseInt(contentLengthStr);
             readFixedLengthBody(in, responseBody, contentLength);
         } else {
-            // Read until the connection is closed
             readUntilEOF(in, responseBody);
         }
 
@@ -172,16 +163,13 @@ public class CustomHttpClient {
     private void readChunkedBody(BufferedReader reader, ByteArrayOutputStream output) throws IOException {
         try {
             while (true) {
-                // Read chunk size line
                 String chunkSizeLine = reader.readLine();
                 if (chunkSizeLine == null) break;
 
-                // Skip empty lines that might appear between chunks
                 if (chunkSizeLine.trim().isEmpty()) {
                     continue;
                 }
 
-                // Parse chunk size (ignore extensions)
                 String hexPart = extractHexPart(chunkSizeLine);
                 if (hexPart.isEmpty()) {
 //                    System.err.println("Warning: Skipping invalid chunk header: " + chunkSizeLine);
@@ -192,25 +180,21 @@ public class CustomHttpClient {
                     int chunkSize = Integer.parseInt(hexPart, 16);
 
                     if (chunkSize == 0) {
-                        // Read the final CRLF after the zero-length chunk
                         reader.readLine();
                         break;
                     }
 
-                    // Read the chunk data
                     char[] buffer = new char[chunkSize];
                     int totalRead = 0;
 
                     while (totalRead < chunkSize) {
                         int read = reader.read(buffer, totalRead, chunkSize - totalRead);
-                        if (read == -1) break; // Unexpected end
+                        if (read == -1) break;
                         totalRead += read;
                     }
 
-                    // Convert the chars to bytes and add to output
                     output.write(new String(buffer, 0, totalRead).getBytes(StandardCharsets.UTF_8));
 
-                    // Read and discard the CRLF after the chunk
                     reader.readLine();
                 } catch (NumberFormatException e) {
                     System.err.println("Warning: Failed to parse chunk size from: " + chunkSizeLine);
@@ -218,10 +202,9 @@ public class CustomHttpClient {
                 }
             }
 
-            // Read trailing headers (if any)
             String line;
             while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                // Just consume the trailing headers
+                //  Consuming the trailing headers
             }
         } catch (IOException e) {
             System.err.println("Error reading chunked body: " + e.getMessage());
@@ -229,32 +212,10 @@ public class CustomHttpClient {
         }
     }
 
-    private String readLine(DataInputStream dis) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        while (true) {
-            int b = dis.readByte();
-            if (b == '\n') break;
-            if (b == '\r') {
-                // Peek next byte
-                dis.mark(1);
-                int next = dis.readByte();
-                if (next != '\n') dis.reset();
-                break;
-            }
-            baos.write(b);
-        }
-        return baos.toString(StandardCharsets.UTF_8.name());
-    }
 
-    /**
-     * Extracts a valid hexadecimal part from a chunk header line.
-     * This handles various edge cases in chunked encoding.
-     */
     private String extractHexPart(String line) {
-        // Remove any leading/trailing whitespace
         line = line.trim();
 
-        // Find the first non-hex character
         int endPos = 0;
         while (endPos < line.length() && isHexDigit(line.charAt(endPos))) {
             endPos++;
@@ -263,9 +224,6 @@ public class CustomHttpClient {
         return endPos > 0 ? line.substring(0, endPos) : "";
     }
 
-    /**
-     * Checks if a character is a valid hexadecimal digit.
-     */
     private boolean isHexDigit(char c) {
         return (c >= '0' && c <= '9') ||
                 (c >= 'a' && c <= 'f') ||
@@ -281,7 +239,7 @@ public class CustomHttpClient {
             int bytesRead = in.read(buffer, 0, bytesToRead);
 
             if (bytesRead == -1) {
-                break; // End of stream
+                break;
             }
 
             output.write(buffer, 0, bytesRead);
