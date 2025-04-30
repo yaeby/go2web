@@ -1,12 +1,11 @@
 package org.c8a.search;
 
-import org.c8a.connection.HttpConnection;
+import org.c8a.client.CustomHttpClient;
 import org.c8a.handler.HttpHandler;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -14,6 +13,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 public class SearchEngine {
 
@@ -27,24 +27,37 @@ public class SearchEngine {
         try {
             String searchTerm = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
             String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
-            HttpURLConnection connection = HttpConnection.getHttpURLConnection(encodedSearchTerm);
+            String searchUrl = "https://html.duckduckgo.com/html/";
 
-            int responseCode = connection.getResponseCode();
+            // Add required form parameters
+            String postData = "q=" + encodedSearchTerm + "&kl=us-en&dt=t";
+
+            CustomHttpClient client = new CustomHttpClient();
+            client.setRequestHeader("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0");
+            client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            client.setRequestHeader("Accept", "text/html");
+            client.setRequestHeader("Accept-Language", "en-US,en;q=0.5");
+            client.setRequestHeader("Referer", "https://html.duckduckgo.com/");
+
+            CustomHttpClient.HttpResponse response = client.request("POST", searchUrl, postData.getBytes(StandardCharsets.UTF_8));
+
+            // Handle 302 redirect
+            if (response.isRedirect()) {
+                String newLocation = response.getHeader("Location");
+                if (newLocation != null) {
+                    response = client.request("GET", newLocation, null);
+                }
+            }
+
+            int responseCode = response.getStatusCode();
             if (responseCode != 200) {
                 System.out.println("\nError: Could not complete search. Response code: " + responseCode);
                 return;
             }
 
-            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
+            String html = response.getBodyAsString();
 
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-
-            List<String> searchResults = extractResults(response.toString());
+            List<String> searchResults = extractResults(html);
             System.out.println("\nTop " + Math.min(10, searchResults.size()) + " search results for: " + searchTerm);
 
             for (int i = 0; i < Math.min(10, searchResults.size()); i++) {

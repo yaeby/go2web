@@ -9,8 +9,6 @@ import org.jsoup.select.Elements;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ContentProcessor {
 
@@ -22,30 +20,24 @@ public class ContentProcessor {
         StringBuilder result = new StringBuilder();
 
         try {
-            // Parse the HTML using JSoup
             Document doc = Jsoup.parse(html);
 
-            // Remove unwanted elements
             doc.select("script, style, iframe, noscript, svg, [style*=display:none], [hidden]").remove();
 
-            // Extract title
             String title = doc.title();
             if (title != null && !title.trim().isEmpty()) {
                 result.append(title).append("\n");
                 result.append(String.valueOf('=').repeat(Math.min(title.length(), 40))).append("\n\n");
             }
 
-            // Try to find main content
             Element mainContent = findMainContent(doc);
 
             if (mainContent != null) {
                 processContent(mainContent, result);
             } else {
-                // If no main content identified, process the body
                 processContent(doc.body(), result);
             }
 
-            // Final cleanup
             String finalResult = result.toString().trim();
             finalResult = finalResult.replaceAll("\n{3,}", "\n\n");
 
@@ -57,7 +49,6 @@ public class ContentProcessor {
     }
 
     private static Element findMainContent(Document doc) {
-        // Common selectors for main content
         String[] contentSelectors = {
                 "main", "article", "div.content", "div.article", "div.post",
                 "div.main-content", "div#content", "div#main", "div#article",
@@ -67,7 +58,6 @@ public class ContentProcessor {
         for (String selector : contentSelectors) {
             Elements elements = doc.select(selector);
             if (!elements.isEmpty()) {
-                // Find the element with the most text content
                 Element bestElement = null;
                 int maxTextLength = 0;
 
@@ -85,13 +75,12 @@ public class ContentProcessor {
             }
         }
 
-        // If no suitable element found, try to find the div with most content
         Elements divs = doc.select("div");
         Element bestDiv = null;
         int maxTextLength = 0;
 
         for (Element div : divs) {
-            if (div.select("div").size() < 3) { // Skip containers with many divs
+            if (div.select("div").size() < 3) {
                 String text = div.text();
                 if (text.length() > maxTextLength) {
                     maxTextLength = text.length();
@@ -106,24 +95,18 @@ public class ContentProcessor {
     private static void processContent(Element element, StringBuilder result) {
         if (element == null) return;
 
-        // Extract headings
         processHeadings(element, result);
 
-        // Extract paragraphs
         boolean foundParagraphs = processParagraphs(element, result);
 
-        // Extract lists
         processLists(element, result);
 
-        // Extract tables
         processTables(element, result);
 
-        // If no substantial content found, extract text from divs
         if (!foundParagraphs && result.length() < 200) {
             processTextDivs(element, result);
         }
 
-        // If still not enough content, just get all the text
         if (result.length() < 100) {
             String text = element.text();
             if (!text.isEmpty()) {
@@ -154,7 +137,7 @@ public class ContentProcessor {
 
         for (Element paragraph : paragraphs) {
             String paragraphText = paragraph.text().trim();
-            if (!paragraphText.isEmpty() && paragraphText.length() > 10) {
+            if (paragraphText.length() > 10) {
                 result.append(paragraphText).append("\n\n");
                 foundContent = true;
             }
@@ -164,7 +147,6 @@ public class ContentProcessor {
     }
 
     private static void processLists(Element element, StringBuilder result) {
-        // Process unordered lists
         Elements unorderedLists = element.select("ul");
         for (Element ul : unorderedLists) {
             result.append("\n");
@@ -178,7 +160,6 @@ public class ContentProcessor {
             result.append("\n");
         }
 
-        // Process ordered lists
         Elements orderedLists = element.select("ol");
         for (Element ol : orderedLists) {
             result.append("\n");
@@ -204,7 +185,6 @@ public class ContentProcessor {
                 Elements headerCells = row.select("th");
                 Elements dataCells = row.select("td");
 
-                // Handle header rows
                 if (!headerCells.isEmpty()) {
                     StringBuilder headerText = new StringBuilder();
                     for (Element cell : headerCells) {
@@ -214,7 +194,6 @@ public class ContentProcessor {
                     result.append(headerLine).append("\n");
                     result.append(String.valueOf('-').repeat(Math.min(headerLine.length(), 40))).append("\n");
                 }
-                // Handle data rows
                 else if (!dataCells.isEmpty()) {
                     StringBuilder rowText = new StringBuilder();
                     for (Element cell : dataCells) {
@@ -232,7 +211,6 @@ public class ContentProcessor {
         Elements divs = element.select("div");
 
         for (Element div : divs) {
-            // Skip divs with certain elements to avoid duplicating content
             if (div.select("p, h1, h2, h3, h4, h5, h6, ul, ol, table").isEmpty()) {
                 String divText = div.text().trim();
                 if (divText.length() > 40 && !processedContents.contains(divText)) {

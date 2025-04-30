@@ -28,7 +28,6 @@ public class CustomHttpClient {
         this.readTimeout = readTimeout;
         this.requestHeaders = new HashMap<>();
 
-        // Set default headers
         setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
         setRequestHeader("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
         setRequestHeader("Accept-Language", "en-US,en;q=0.5");
@@ -76,43 +75,34 @@ public class CustomHttpClient {
 
             Socket socket;
             if (isHttps) {
-                // For HTTPS, we need to use SSL/TLS
                 socket = SSLSocketFactory.createSSLSocket(host, port, connectTimeout);
             } else {
-                // For HTTP, we use a regular socket
                 socket = new Socket(host, port);
                 socket.setSoTimeout(readTimeout);
             }
 
-            // Prepare the HTTP request
             StringBuilder requestBuilder = new StringBuilder();
             requestBuilder.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
             requestBuilder.append("Host: ").append(host).append("\r\n");
 
-            // Add all headers
             for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
                 requestBuilder.append(header.getKey()).append(": ").append(header.getValue()).append("\r\n");
             }
 
-            // Add Content-Length if there's a body
             if (body != null && body.length > 0) {
                 requestBuilder.append("Content-Length: ").append(body.length).append("\r\n");
             }
 
-            // End of headers
             requestBuilder.append("\r\n");
 
-            // Send the request
             OutputStream out = socket.getOutputStream();
             out.write(requestBuilder.toString().getBytes("UTF-8"));
 
-            // Send the body if present
             if (body != null && body.length > 0) {
                 out.write(body);
             }
             out.flush();
 
-            // Read the response
             InputStream in = socket.getInputStream();
             return parseResponse(in);
 
