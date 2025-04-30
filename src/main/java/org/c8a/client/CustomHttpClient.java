@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -140,7 +141,6 @@ public class CustomHttpClient {
                 String headerValue = line.substring(colonPos + 1).trim();
                 headers.put(headerName, headerValue);
 
-                // Store the headers case-insensitively for easier access
                 headers.put(headerName.toLowerCase(), headerValue);
             }
         }
@@ -170,65 +170,80 @@ public class CustomHttpClient {
     }
 
     private void readChunkedBody(BufferedReader reader, ByteArrayOutputStream output) throws IOException {
-        String line;
-        boolean inChunkData = false;
-        int remainingBytesInChunk = 0;
-
         try {
-            while ((line = reader.readLine()) != null) {
-                // If we're not in the middle of a chunk, this line should be a chunk size
-                if (!inChunkData) {
-                    // Skip empty lines that might appear between chunks
-                    if (line.trim().isEmpty()) {
-                        continue;
-                    }
+            while (true) {
+                // Read chunk size line
+                String chunkSizeLine = reader.readLine();
+                if (chunkSizeLine == null) break;
 
-                    // Extract only valid hex characters for chunk size
-                    String hexPart = extractHexPart(line);
-
-                    if (hexPart.isEmpty()) {
-                        System.err.println("Warning: Skipping invalid chunk header: " + line);
-                        continue;
-                    }
-
-                    try {
-                        remainingBytesInChunk = Integer.parseInt(hexPart, 16);
-
-                        // Handle end of chunked data
-                        if (remainingBytesInChunk == 0) {
-                            break;
-                        }
-
-                        inChunkData = true;
-                        continue;
-                    } catch (NumberFormatException e) {
-                        System.err.println("Warning: Failed to parse chunk size from: " + line);
-                        // If we can't parse the chunk size, we'll try to continue and look for the next valid chunk header
-                        continue;
-                    }
+                // Skip empty lines that might appear between chunks
+                if (chunkSizeLine.trim().isEmpty()) {
+                    continue;
                 }
 
-                // We're in a chunk's data section
-                if (inChunkData) {
-                    // Convert line to bytes (adding back the newline that readLine() removed)
-                    byte[] lineBytes = (line + "\r\n").getBytes("UTF-8");
+                // Parse chunk size (ignore extensions)
+                String hexPart = extractHexPart(chunkSizeLine);
+                if (hexPart.isEmpty()) {
+//                    System.err.println("Warning: Skipping invalid chunk header: " + chunkSizeLine);
+                    continue;
+                }
 
-                    // If this line is longer than the remaining bytes in the chunk, truncate it
-                    int bytesToWrite = Math.min(lineBytes.length, remainingBytesInChunk);
-                    output.write(lineBytes, 0, bytesToWrite);
+                try {
+                    int chunkSize = Integer.parseInt(hexPart, 16);
 
-                    remainingBytesInChunk -= bytesToWrite;
-
-                    // If we've read all bytes in this chunk, look for next chunk
-                    if (remainingBytesInChunk <= 0) {
-                        inChunkData = false;
+                    if (chunkSize == 0) {
+                        // Read the final CRLF after the zero-length chunk
+                        reader.readLine();
+                        break;
                     }
+
+                    // Read the chunk data
+                    char[] buffer = new char[chunkSize];
+                    int totalRead = 0;
+
+                    while (totalRead < chunkSize) {
+                        int read = reader.read(buffer, totalRead, chunkSize - totalRead);
+                        if (read == -1) break; // Unexpected end
+                        totalRead += read;
+                    }
+
+                    // Convert the chars to bytes and add to output
+                    output.write(new String(buffer, 0, totalRead).getBytes(StandardCharsets.UTF_8));
+
+                    // Read and discard the CRLF after the chunk
+                    reader.readLine();
+                } catch (NumberFormatException e) {
+                    System.err.println("Warning: Failed to parse chunk size from: " + chunkSizeLine);
+                    continue;
                 }
             }
+
+            // Read trailing headers (if any)
+            String line;
+            while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                // Just consume the trailing headers
+            }
         } catch (IOException e) {
-            System.err.println("Warning: Error while reading chunked body: " + e.getMessage());
+            System.err.println("Error reading chunked body: " + e.getMessage());
             throw e;
         }
+    }
+
+    private String readLine(DataInputStream dis) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        while (true) {
+            int b = dis.readByte();
+            if (b == '\n') break;
+            if (b == '\r') {
+                // Peek next byte
+                dis.mark(1);
+                int next = dis.readByte();
+                if (next != '\n') dis.reset();
+                break;
+            }
+            baos.write(b);
+        }
+        return baos.toString(StandardCharsets.UTF_8.name());
     }
 
     /**
