@@ -1,12 +1,12 @@
 package org.c8a.search;
 
-import org.c8a.connection.HttpConnection;
 import org.c8a.handler.HttpHandler;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ public class SearchEngine {
         try {
             String searchTerm = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
             String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
-            HttpURLConnection connection = HttpConnection.getHttpURLConnection(encodedSearchTerm);
+            HttpURLConnection connection = getHttpURLConnection(encodedSearchTerm);
 
             int responseCode = connection.getResponseCode();
             if (responseCode != 200) {
@@ -76,6 +76,19 @@ public class SearchEngine {
         } catch (IOException e) {
             System.out.println("\nError during search: " + e.getMessage());
         }
+    }
+
+    public static HttpURLConnection getHttpURLConnection(String encodedSearchTerm) throws IOException {
+        String searchUrl = "https://html.duckduckgo.com/html/?q=" + encodedSearchTerm;
+
+        URL url = new URL(searchUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
+        connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
+        connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+        connection.setRequestProperty("Connection", "keep-alive");
+        return connection;
     }
 
     private static List<String> extractResults(String html) {
