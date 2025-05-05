@@ -21,7 +21,7 @@ public class HttpHandler {
 
     private final CacheManager cacheManager;
     private static final int MAX_REDIRECTS = 5;
-    private static final int TIMEOUT = 10000; // 10 seconds
+    private static final int TIMEOUT = 10000;
 
     public HttpHandler(CacheManager cacheManager) {
         this.cacheManager = cacheManager;

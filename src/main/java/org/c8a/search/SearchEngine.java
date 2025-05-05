@@ -1,12 +1,11 @@
 package org.c8a.search;
 
+import org.c8a.client.CustomHttpClient;
 import org.c8a.handler.HttpHandler;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -17,7 +16,7 @@ import java.util.regex.Pattern;
 
 public class SearchEngine {
 
-    private HttpHandler handler;
+    private final HttpHandler handler;
 
     public SearchEngine(HttpHandler handler) {
         this.handler = handler;
@@ -27,24 +26,19 @@ public class SearchEngine {
         try {
             String searchTerm = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
             String encodedSearchTerm = URLEncoder.encode(searchTerm, StandardCharsets.UTF_8);
-            HttpURLConnection connection = getHttpURLConnection(encodedSearchTerm);
 
-            int responseCode = connection.getResponseCode();
+            CustomHttpClient client = new CustomHttpClient();
+            CustomHttpClient.HttpResponse response = client.get("https://html.duckduckgo.com/html/?q=" + encodedSearchTerm);
+            int responseCode = response.getStatusCode();
+
             if (responseCode != 200) {
                 System.out.println("\nError: Could not complete search. Response code: " + responseCode);
                 return;
             }
 
-            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
+            String responseBody = response.getBodyAsString();
 
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-
-            List<String> searchResults = extractResults(response.toString());
+            List<String> searchResults = extractResults(responseBody);
             System.out.println("\nTop " + Math.min(10, searchResults.size()) + " search results for: " + searchTerm);
 
             for (int i = 0; i < Math.min(10, searchResults.size()); i++) {
@@ -78,33 +72,18 @@ public class SearchEngine {
         }
     }
 
-    public static HttpURLConnection getHttpURLConnection(String encodedSearchTerm) throws IOException {
-        String searchUrl = "https://html.duckduckgo.com/html/?q=" + encodedSearchTerm;
-
-        URL url = new URL(searchUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36");
-        connection.setRequestProperty("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
-        connection.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-        connection.setRequestProperty("Connection", "keep-alive");
-        return connection;
-    }
-
     private static List<String> extractResults(String html) {
         List<String> results = new ArrayList<>();
 
-        Pattern pattern = Pattern.compile("<a class=\"result__url\" href=\"([^\"]+)\"");
+        Pattern pattern = Pattern.compile("<a class=\"result__url\" href=\"[^\"]+\">\\s*(.*?)\\s*</a>");
         Matcher matcher = pattern.matcher(html);
 
         while (matcher.find() && results.size() < 10) {
             String url = matcher.group(1);
-            if (url.startsWith("//")) {
-                url = "https:" + url;
-            }
             results.add(url);
         }
 
         return results;
     }
+
 }
