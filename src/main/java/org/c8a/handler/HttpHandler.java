@@ -55,7 +55,7 @@ public class HttpHandler {
                 CustomHttpClient.HttpResponse response = client.get(urlString);
                 int responseCode = response.getStatusCode();
 
-                if (responseCode == 304) { // Not Modified
+                if (responseCode == 304) {
                     System.out.println("\nResource not modified. Serving from cache:");
                     assert cached != null;
                     System.out.println(cached.content());
@@ -87,6 +87,7 @@ public class HttpHandler {
 
                 String responseBody = response.getBodyAsString();
                 String contentType = response.getHeader("Content-Type");
+
                 if (contentType == null) {
                     contentType = "text/html";
                 } else if (contentType.contains(";")) {
@@ -94,7 +95,7 @@ public class HttpHandler {
                 }
 
                 String readableContent;
-                if ("application/json".equals(contentType)) {
+                if (contentType.equals("application/json")) {
                     readableContent = ContentProcessor.formatJson(responseBody);
                 } else {
                     readableContent = ContentProcessor.extractReadableContent(responseBody);

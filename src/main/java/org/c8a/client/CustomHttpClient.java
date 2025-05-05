@@ -32,7 +32,7 @@ public class CustomHttpClient {
         setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
         setRequestHeader("Accept", "application/json, text/html;q=0.9, application/xhtml+xml;q=0.8, application/xml;q=0.7");
         setRequestHeader("Accept-Language", "en-US,en;q=0.5");
-        setRequestHeader("Connection", "close"); // Don't keep connections alive
+        setRequestHeader("Connection", "close");
     }
 
     public void setRequestHeader(String name, String value) {

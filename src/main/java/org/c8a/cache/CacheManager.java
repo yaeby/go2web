@@ -18,8 +18,7 @@ public class CacheManager {
     }
 
     public CacheEntry getEntry(String url) {
-        CacheEntry entry = cache.get(url);
-        return (entry != null && !entry.isExpired()) ? entry : null;
+        return cache.get(url);
     }
 
     public void addEntry(String url, CacheEntry entry) {
@@ -28,6 +27,7 @@ public class CacheManager {
 
     private void loadCacheFromFile() {
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(CACHE_FILE))) {
+
             @SuppressWarnings("unchecked")
             Map<String, CacheEntry> loadedCache = (Map<String, CacheEntry>) ois.readObject();
 
